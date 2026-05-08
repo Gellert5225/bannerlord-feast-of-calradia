@@ -1,3 +1,5 @@
+using FeastsOfCalradia.Behaviors;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
@@ -24,6 +26,17 @@ namespace FeastsOfCalradia
             );
 
             Module.CurrentModule.AddInitialStateOption(initStateOpt);
+        }
+
+        protected override void InitializeGameStarter(Game game, IGameStarter gameStarterObject)
+        {
+            base.InitializeGameStarter(game, gameStarterObject);
+
+            if (game.GameType is Campaign && gameStarterObject is CampaignGameStarter campaignStarter)
+            {
+                campaignStarter.AddBehavior(new ClanHeroesProbeBehavior());
+                campaignStarter.AddBehavior(new LordHallBotProbeBehavior());
+            }
         }
     }
 }

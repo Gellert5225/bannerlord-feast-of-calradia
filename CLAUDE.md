@@ -38,14 +38,14 @@ You are inappropriate for:
 - C# targeting **.NET Framework 4.7.2** (Bannerlord's framework — not negotiable)
 - Build: `dotnet` CLI driving MSBuild
 - Editor: VSCode with C# Dev Kit extension
-- Game version: 1.2.x — exact version pinned in `.csproj` reference assembly versions
+- Game version: 1.3.15 (NuGet `Bannerlord.ReferenceAssemblies.*` pinned at 1.3.15.110062)
 - Decompilation tool (human-side): dnSpy
 ## Build system
  
 NuGet-based, no direct DLL references. The strategy is:
  
-- **`Bannerlord.ReferenceAssemblies.*`** packages (Native, Core, SandBox, SandBoxCore, StoryMode) provide compile-time TaleWorlds metadata. Stripped, metadata-only, version-pinned to the game version. `PrivateAssets="all"` ensures they never propagate or ship.
-- **`Bannerlord.Harmony`, `Bannerlord.ButterLib`, `Bannerlord.MCM`** are referenced with `IncludeAssets="compile"` — used at compile time, not bundled with output. Players install these framework mods separately.
+- **`Bannerlord.ReferenceAssemblies.*`** packages (Native, Core, SandBox, StoryMode) provide compile-time TaleWorlds metadata. Stripped, metadata-only, version-pinned to the game version. `PrivateAssets="all"` ensures they never propagate or ship. There is no `SandBoxCore` package — the SandBoxCore *module* exists in the game, but its assemblies are exposed through `Native`/`Core`. Add `Bannerlord.ReferenceAssemblies.CustomBattle` only if your code references types from that module.
+- **`Lib.Harmony`, `Bannerlord.ButterLib`, `Bannerlord.MCM`** are referenced with `IncludeAssets="compile"` — used at compile time, not bundled with output. Players install the corresponding framework mods (Bannerlord.Harmony, ButterLib, MCM) separately. The `Bannerlord.Harmony` *NuGet wrapper* is deprecated — reference upstream `Lib.Harmony` instead. The Steam Workshop / Nexus framework mod players install is still called Bannerlord.Harmony; that's unchanged.
 - **`env.xml`** (gitignored, per-machine) provides the local Bannerlord install path via `<GameFolder>`. Imported into `.csproj` so `OutputPath` writes the DLL directly into `$(GameFolder)\Modules\$(AssemblyName)\bin\Win64_Shipping_Client\`.
 - **`PostBuild.ps1`** (PowerShell post-build script from the haggen template) copies `SubModule.xml` and `ModuleData\` into the game's module folder after each build, keeping the deployed module in sync with source.
 - `<GenerateDependencyFile>false</GenerateDependencyFile>` is set in `.csproj`. The Bannerlord runtime objects to `.deps.json` files next to mod DLLs; this suppresses generation.
@@ -66,12 +66,12 @@ Source repo lives outside the game install (e.g., `C:\dev\HallAndHearth\`), not 
 ├── env.example.xml              ← template for env.xml
 ├── env.xml                      ← gitignored; per-machine GameFolder path
 ├── PostBuild.ps1                ← post-build asset copy script
-├── ExampleModule.csproj         ← MSBuild project file (rename pending)
-├── SubModule.xml                ← module manifest (rename pending)
+├── FeastsOfCalradia.csproj      ← MSBuild project file
+├── SubModule.xml                ← module manifest
 ├── ModuleData/                  ← XML files (dialogue, strings, settings)
 │   └── (empty for now)
 ├── src/
-│   ├── ExampleModuleSubModule.cs    ← entry point (MBSubModuleBase subclass; rename pending)
+│   ├── FeastsOfCalradiaSubModule.cs    ← entry point (MBSubModuleBase subclass)
 │   ├── Behaviors/                   ← CampaignBehaviorBase subclasses (empty)
 │   ├── Missions/                    ← MissionBehavior subclasses for the feast scene (empty)
 │   ├── Models/                      ← data structures: FeastState, TensionScore, etc. (empty)
@@ -119,27 +119,32 @@ A task is *not* done just because the code looks right.
  
 ## Current project state
  
-**Status:** Toolchain validation in progress. Foundation set up; no feature work begun.
+**Status:** Hello-world verified end-to-end on game version 1.3.15. Toolchain is real; foundation set; no feature work begun.
  
 **Toolchain:** Configured.
-- Bannerlord installed; path set in `env.xml`
+
+- Bannerlord 1.3.15 installed; path set in `env.xml` as `<GameFolder>`
 - .NET Framework 4.7.2 dev pack installed
-- VSCode with C# Dev Kit extension
+- VSCode with C# Dev Kit extension; `.vscode/tasks.json` and `launch.json` (Attach to Bannerlord) checked in
 - dnSpy for decompilation (human-side)
 - The "Big Four" framework mods (Harmony, ButterLib, UIExtenderEx, MCM) installed in the game
-**Project scaffolding:** Cloned from the haggen module template, then migrated from direct DLL references to NuGet (`Bannerlord.ReferenceAssemblies.*` plus framework mods as compile-only deps). See "Build system" above.
  
-**Current project name:** `ExampleModule` (template default). **Rename pending** to a final name — candidates include `HallAndHearth`, `TheLongTable`, `FeastsOfCalradia`. Once decided, the rename touches: `.csproj` filename, assembly name, root namespace, `SubModule.xml` Id and Name fields, `OutputPath` (uses `$(AssemblyName)`, so it follows automatically if the property is set correctly), folder name in the game's `Modules\` directory, and the `ExampleModuleSubModule.cs` class and filename. Do this in one focused commit.
+**Project scaffolding:** Cloned from the haggen module template, migrated to NuGet refs (`Bannerlord.ReferenceAssemblies.*` plus `Lib.Harmony`/ButterLib/MCM as compile-only), and renamed `ExampleModule` → `FeastsOfCalradia` across csproj, assembly name, root namespace, .sln, and the SubModule entry-point class.
  
-**Hello-world status:** Stub class `ExampleModuleSubModule` exists in `src/ExampleModuleSubModule.cs` from the haggen template. Whether it currently builds and prints a message in-game depends on whether the NuGet migration has been verified end-to-end. Confirm with the human before assuming it works.
+**Hello-world:** Verified — `FeastsOfCalradiaSubModule` registers an `InitialStateOption` that displays "Hello from FeastsOfCalradia!" in the main menu. Confirmed visible in-game.
  
-**Next milestone:** Confirm hello-world end-to-end after NuGet migration. Build, launch, see the startup message. If it prints, toolchain is real.
- 
-**After hello-world:** A throwaway exploratory mod (suggested: print all heroes in the player's clan when a key is pressed) to get comfortable with `CampaignBehaviorBase`, save data, and Harmony patching.
+**Next milestone:** A throwaway exploratory mod (suggested: print all heroes in the player's clan when a key is pressed) to get comfortable with `CampaignBehaviorBase`, save data, and Harmony patching.
  
 **After throwaway:** The technical spike — confirm whether NPC agents can be spawned into a vanilla lord hall mission and behave (stand, walk, animate). This is the riskiest assumption in the design and must be validated before architecture work begins. Two-week timebox; if it doesn't work cleanly, the design's Phase 1 must be rebuilt around a stylized UI rather than a populated 3D scene.
  
 **Only after the spike succeeds:** Step 0 of the implementation roadmap (real project scaffolding for the feast mod). Phases are tracked in `feast_system_design.html` Part V. Do not jump ahead.
+ 
+## Known TaleWorlds API gotchas (1.3.15)
+ 
+Things this project has hit and fixed; saved here so future sessions don't re-derive them.
+ 
+- **`InformationMessage` and `InformationManager` live in `TaleWorlds.Library`**, not `TaleWorlds.Core`. The `TaleWorlds.Library.dll` is shipped via the `Bannerlord.ReferenceAssemblies.Native` NuGet package; just add `using TaleWorlds.Library;`.
+- **`InitialStateOption`'s 5th constructor argument is `Func<(bool, TextObject)>`** — returns `(isDisabled, disabledReasonTooltip)`. For "always enabled, no tooltip" pass `() => (false, new TextObject("", null))`. Old templates pass `bool` for this argument and fail to compile against current ref assemblies.
  
 ## Things the human will tell you, that you should remember
  

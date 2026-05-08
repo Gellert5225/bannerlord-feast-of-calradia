@@ -9,3 +9,5 @@
 .idea/
 *.user
 *.suo
+
+/dnSpy-net-win64
