@@ -4,7 +4,12 @@
       "WebFetch(domain:www.nuget.org)",
       "WebSearch",
       "Bash(git -C \"i:/bannerlord-feast-of-calradia\" ls-files Module/)",
-      "Bash(git -C \"i:/bannerlord-feast-of-calradia\" status)"
+      "Bash(git -C \"i:/bannerlord-feast-of-calradia\" status)",
+      "WebFetch(domain:mcm.bannerlord.aragas.org)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:butr.github.io)",
+      "WebFetch(domain:uiextenderex.butr.link)"
     ]
   }
 }

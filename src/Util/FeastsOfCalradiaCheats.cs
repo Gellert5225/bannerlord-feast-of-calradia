@@ -104,5 +104,23 @@ namespace FeastsOfCalradia.Util
             behavior.TargetHeroStringId = match.StringId;
             return "Lord hall bot will now spawn as " + match.Name + " (" + match.StringId + "). Re-enter the settlement to take effect.";
         }
+
+        // Manually fires the player's feast scheduler. Same gate as the town/castle menu option:
+        // player must be inside a fief their clan owns. Useful for fast-iterating on later steps
+        // (RSVPs, travel, scene) without having to wait for AI events to fire.
+        [CommandLineFunctionality.CommandLineArgumentFunction("host_feast", "campaign")]
+        public static string HostFeast(List<string> strings)
+        {
+            if (Campaign.Current == null)
+            {
+                return "No active campaign.";
+            }
+            FeastSystemBehavior behavior = Campaign.Current.GetCampaignBehavior<FeastSystemBehavior>();
+            if (behavior == null)
+            {
+                return "FeastSystemBehavior not registered.";
+            }
+            return behavior.RequestPlayerFeast();
+        }
     }
 }

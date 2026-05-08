@@ -1,0 +1,1644 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Feast System — Design Specification & Implementation Roadmap</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --parchment: #f5ecd6;
+    --parchment-warm: #ebe0c4;
+    --parchment-dim: #ddd0ae;
+    --ink: #1c130b;
+    --ink-soft: #463729;
+    --ink-faint: #7a6855;
+    --rubric: #8b1a1a;
+    --rubric-bright: #a02020;
+    --gold: #9a7416;
+    --gold-soft: #c9a847;
+    --rule: #b8a684;
+    --shadow: rgba(28, 19, 11, 0.12);
+    --code-bg: #ede0c2;
+    --note-bg: #f0e4c3;
+  }
+
+  * { box-sizing: border-box; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    margin: 0;
+    background: var(--parchment);
+    color: var(--ink);
+    font-family: 'EB Garamond', Georgia, serif;
+    font-size: 18px;
+    line-height: 1.65;
+    background-image:
+      radial-gradient(ellipse at top left, rgba(154, 116, 22, 0.04), transparent 50%),
+      radial-gradient(ellipse at bottom right, rgba(139, 26, 26, 0.03), transparent 50%);
+    background-attachment: fixed;
+  }
+
+  /* Subtle paper texture */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background-image:
+      repeating-linear-gradient(
+        93deg,
+        transparent 0,
+        transparent 2px,
+        rgba(28, 19, 11, 0.008) 2px,
+        rgba(28, 19, 11, 0.008) 3px
+      );
+    z-index: 1;
+  }
+
+  .container {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 80px 32px 120px;
+    position: relative;
+    z-index: 2;
+  }
+
+  /* MASTHEAD */
+  header.masthead {
+    text-align: center;
+    margin-bottom: 80px;
+    padding-bottom: 48px;
+    border-bottom: 1px solid var(--rule);
+    position: relative;
+  }
+
+  header.masthead::after {
+    content: '❦';
+    position: absolute;
+    bottom: -16px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--parchment);
+    padding: 0 16px;
+    color: var(--rubric);
+    font-size: 24px;
+  }
+
+  .eyebrow {
+    font-family: 'Cinzel', serif;
+    font-size: 11px;
+    letter-spacing: 0.4em;
+    color: var(--ink-faint);
+    margin-bottom: 24px;
+    font-weight: 500;
+  }
+
+  h1.title {
+    font-family: 'Cinzel', serif;
+    font-weight: 600;
+    font-size: 44px;
+    letter-spacing: 0.04em;
+    line-height: 1.1;
+    margin: 0 0 20px;
+    color: var(--ink);
+  }
+
+  h1.title .red {
+    color: var(--rubric);
+  }
+
+  .subtitle {
+    font-family: 'Cormorant Garamond', serif;
+    font-style: italic;
+    font-size: 22px;
+    color: var(--ink-soft);
+    margin-bottom: 32px;
+    font-weight: 400;
+  }
+
+  .meta {
+    font-family: 'Cinzel', serif;
+    font-size: 10px;
+    letter-spacing: 0.3em;
+    color: var(--ink-faint);
+  }
+
+  .meta span { margin: 0 12px; }
+
+  /* TOC */
+  nav.toc {
+    margin-bottom: 96px;
+    padding: 32px 36px;
+    background: var(--parchment-warm);
+    border: 1px solid var(--rule);
+    border-radius: 2px;
+    box-shadow: 0 1px 0 var(--shadow);
+  }
+
+  nav.toc h2 {
+    font-family: 'Cinzel', serif;
+    font-size: 13px;
+    letter-spacing: 0.3em;
+    margin: 0 0 20px;
+    color: var(--rubric);
+    font-weight: 600;
+    text-align: center;
+  }
+
+  nav.toc ol {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    counter-reset: toc;
+  }
+
+  nav.toc > ol > li {
+    counter-increment: toc;
+    margin-bottom: 12px;
+    padding-left: 48px;
+    position: relative;
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 18px;
+    font-weight: 500;
+  }
+
+  nav.toc > ol > li::before {
+    content: counter(toc, upper-roman) '.';
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 36px;
+    text-align: right;
+    color: var(--gold);
+    font-family: 'Cinzel', serif;
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  nav.toc ol ol {
+    list-style: none;
+    padding: 8px 0 0 0;
+    margin: 0;
+    counter-reset: toc-sub;
+  }
+
+  nav.toc ol ol li {
+    counter-increment: toc-sub;
+    padding-left: 24px;
+    position: relative;
+    margin-bottom: 4px;
+    font-size: 16px;
+    font-weight: 400;
+    font-family: 'EB Garamond', serif;
+    font-style: italic;
+    color: var(--ink-soft);
+  }
+
+  nav.toc ol ol li::before {
+    content: '·';
+    position: absolute;
+    left: 8px;
+    color: var(--gold);
+  }
+
+  nav.toc a {
+    color: inherit;
+    text-decoration: none;
+    border-bottom: 1px dotted transparent;
+    transition: border-color 0.2s, color 0.2s;
+  }
+
+  nav.toc a:hover {
+    color: var(--rubric);
+    border-bottom-color: var(--rubric);
+  }
+
+  /* PARTS */
+  section.part {
+    margin-bottom: 96px;
+  }
+
+  .part-marker {
+    font-family: 'Cinzel', serif;
+    font-size: 11px;
+    letter-spacing: 0.4em;
+    color: var(--gold);
+    text-align: center;
+    margin-bottom: 16px;
+    font-weight: 600;
+  }
+
+  h2.part-title {
+    font-family: 'Cinzel', serif;
+    font-size: 30px;
+    letter-spacing: 0.05em;
+    text-align: center;
+    margin: 0 0 16px;
+    color: var(--ink);
+    font-weight: 600;
+    line-height: 1.2;
+  }
+
+  .part-divider {
+    text-align: center;
+    margin: 32px auto 56px;
+    color: var(--rubric);
+    font-size: 18px;
+    letter-spacing: 1em;
+  }
+
+  .part-divider::before {
+    content: '✦ ✦ ✦';
+  }
+
+  /* HEADINGS */
+  h3 {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 26px;
+    font-weight: 600;
+    color: var(--ink);
+    margin: 56px 0 16px;
+    line-height: 1.3;
+    border-bottom: 1px solid var(--rule);
+    padding-bottom: 8px;
+  }
+
+  h3 .num {
+    color: var(--rubric);
+    font-family: 'Cinzel', serif;
+    font-size: 16px;
+    margin-right: 12px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+  }
+
+  h4 {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 21px;
+    font-weight: 600;
+    color: var(--ink-soft);
+    margin: 36px 0 12px;
+    font-style: italic;
+  }
+
+  h5 {
+    font-family: 'EB Garamond', serif;
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--rubric);
+    margin: 24px 0 8px;
+    letter-spacing: 0.02em;
+  }
+
+  /* BODY TEXT */
+  p {
+    margin: 0 0 18px;
+    text-align: justify;
+    hyphens: auto;
+  }
+
+  p.lede {
+    font-size: 19px;
+    color: var(--ink-soft);
+    font-style: italic;
+    margin-bottom: 32px;
+  }
+
+  /* DROP CAP for first paragraph after part-divider */
+  .part-divider + p::first-letter,
+  .drop p:first-of-type::first-letter {
+    font-family: 'Cinzel', serif;
+    font-size: 56px;
+    font-weight: 700;
+    float: left;
+    line-height: 0.85;
+    margin: 6px 8px 0 0;
+    color: var(--rubric);
+  }
+
+  strong {
+    font-weight: 600;
+    color: var(--ink);
+  }
+
+  em {
+    font-style: italic;
+  }
+
+  /* SMALL CAPS */
+  .sc {
+    font-variant: small-caps;
+    letter-spacing: 0.05em;
+    font-weight: 500;
+  }
+
+  /* LISTS */
+  ul, ol {
+    margin: 0 0 20px;
+    padding-left: 28px;
+  }
+
+  ul li, ol li {
+    margin-bottom: 6px;
+    padding-left: 4px;
+  }
+
+  ul {
+    list-style: none;
+  }
+
+  ul li {
+    position: relative;
+    padding-left: 22px;
+  }
+
+  ul li::before {
+    content: '◆';
+    position: absolute;
+    left: 0;
+    top: 0;
+    color: var(--gold);
+    font-size: 11px;
+    line-height: 1.8;
+  }
+
+  /* DEFINITION-STYLE */
+  dl {
+    margin: 0 0 24px;
+  }
+
+  dl dt {
+    font-weight: 600;
+    color: var(--rubric);
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 18px;
+    margin-top: 14px;
+  }
+
+  dl dd {
+    margin: 4px 0 0 0;
+  }
+
+  /* BLOCKQUOTE */
+  blockquote {
+    margin: 24px 0;
+    padding: 16px 28px;
+    border-left: 3px solid var(--rubric);
+    background: var(--note-bg);
+    font-style: italic;
+    color: var(--ink-soft);
+  }
+
+  blockquote p { margin-bottom: 8px; }
+  blockquote p:last-child { margin-bottom: 0; }
+
+  /* CODE */
+  code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.85em;
+    background: var(--code-bg);
+    padding: 1px 6px;
+    border-radius: 2px;
+    color: var(--ink);
+    border: 1px solid var(--rule);
+  }
+
+  pre {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    line-height: 1.55;
+    background: var(--code-bg);
+    border: 1px solid var(--rule);
+    border-left: 3px solid var(--gold);
+    padding: 16px 20px;
+    overflow-x: auto;
+    margin: 20px 0;
+    border-radius: 2px;
+  }
+
+  pre code {
+    background: none;
+    border: none;
+    padding: 0;
+  }
+
+  /* TABLES */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 24px 0;
+    font-size: 16px;
+    background: var(--parchment-warm);
+    border: 1px solid var(--rule);
+  }
+
+  th {
+    font-family: 'Cinzel', serif;
+    font-size: 11px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--rubric);
+    text-align: left;
+    padding: 10px 14px;
+    border-bottom: 2px solid var(--rule);
+    background: var(--parchment-dim);
+    font-weight: 600;
+  }
+
+  td {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--rule);
+    vertical-align: top;
+  }
+
+  tr:last-child td { border-bottom: none; }
+
+  /* CALLOUT BOXES */
+  .callout {
+    margin: 28px 0;
+    padding: 20px 24px;
+    border-radius: 2px;
+    border: 1px solid var(--rule);
+    background: var(--note-bg);
+    position: relative;
+  }
+
+  .callout-label {
+    font-family: 'Cinzel', serif;
+    font-size: 10px;
+    letter-spacing: 0.3em;
+    font-weight: 600;
+    margin-bottom: 8px;
+    display: block;
+  }
+
+  .callout.confidence-high .callout-label { color: #2d6a3e; }
+  .callout.confidence-med .callout-label { color: var(--gold); }
+  .callout.confidence-low .callout-label { color: var(--rubric); }
+  .callout.warn .callout-label { color: var(--rubric); }
+  .callout.note .callout-label { color: var(--ink-faint); }
+
+  .callout p:last-child { margin-bottom: 0; }
+
+  /* TAGS / BADGES */
+  .tag {
+    display: inline-block;
+    font-family: 'Cinzel', serif;
+    font-size: 9px;
+    letter-spacing: 0.2em;
+    padding: 3px 10px;
+    border-radius: 2px;
+    margin-right: 6px;
+    margin-bottom: 4px;
+    font-weight: 600;
+    vertical-align: middle;
+  }
+
+  .tag.v1 { background: var(--rubric); color: var(--parchment); }
+  .tag.v2 { background: var(--gold); color: var(--parchment); }
+  .tag.v3 { background: var(--ink-faint); color: var(--parchment); }
+  .tag.risk-low { background: #2d6a3e; color: var(--parchment); }
+  .tag.risk-med { background: var(--gold); color: var(--parchment); }
+  .tag.risk-high { background: var(--rubric); color: var(--parchment); }
+
+  /* PHASE ENVELOPES */
+  .phase {
+    margin: 56px 0;
+    padding: 32px 36px;
+    background: var(--parchment-warm);
+    border: 1px solid var(--rule);
+    border-left: 4px solid var(--rubric);
+    box-shadow: 0 1px 3px var(--shadow);
+    border-radius: 2px;
+  }
+
+  .phase-header {
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+    margin-bottom: 4px;
+    border-bottom: 1px solid var(--rule);
+    padding-bottom: 12px;
+    margin-bottom: 20px;
+  }
+
+  .phase-num {
+    font-family: 'Cinzel', serif;
+    font-size: 32px;
+    font-weight: 700;
+    color: var(--rubric);
+    line-height: 1;
+  }
+
+  .phase-name {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 26px;
+    font-weight: 600;
+    color: var(--ink);
+    line-height: 1.2;
+    flex: 1;
+  }
+
+  .phase-tagline {
+    font-family: 'EB Garamond', serif;
+    font-style: italic;
+    color: var(--ink-soft);
+    margin-bottom: 24px;
+    font-size: 17px;
+  }
+
+  /* IMPLEMENTATION STEP */
+  .step {
+    margin: 32px 0;
+    padding: 24px 28px;
+    border: 1px solid var(--rule);
+    background: var(--parchment-warm);
+    border-radius: 2px;
+    position: relative;
+  }
+
+  .step-num {
+    position: absolute;
+    top: -14px;
+    left: 24px;
+    background: var(--parchment);
+    padding: 0 12px;
+    font-family: 'Cinzel', serif;
+    font-size: 11px;
+    letter-spacing: 0.25em;
+    color: var(--rubric);
+    font-weight: 600;
+    border: 1px solid var(--rule);
+    border-radius: 2px;
+  }
+
+  .step h4 {
+    margin-top: 8px;
+  }
+
+  .step-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 12px 0;
+    font-family: 'Cinzel', serif;
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    color: var(--ink-faint);
+  }
+
+  /* FOOTER */
+  footer.colophon {
+    margin-top: 120px;
+    padding-top: 40px;
+    border-top: 1px solid var(--rule);
+    text-align: center;
+    font-family: 'Cormorant Garamond', serif;
+    font-style: italic;
+    color: var(--ink-faint);
+    font-size: 16px;
+  }
+
+  footer.colophon .ornament {
+    color: var(--rubric);
+    margin-bottom: 24px;
+    font-size: 20px;
+  }
+
+  /* LINKS */
+  a {
+    color: var(--rubric);
+    text-decoration: none;
+    border-bottom: 1px dotted var(--rubric);
+  }
+
+  a:hover {
+    color: var(--rubric-bright);
+    border-bottom-style: solid;
+  }
+
+  /* MISC */
+  hr.ornament {
+    border: none;
+    text-align: center;
+    margin: 48px 0;
+    color: var(--gold);
+  }
+
+  hr.ornament::after {
+    content: '· · ·';
+    letter-spacing: 0.6em;
+    font-size: 16px;
+  }
+
+  /* MOBILE */
+  @media (max-width: 640px) {
+    .container { padding: 48px 20px 80px; }
+    h1.title { font-size: 32px; }
+    .subtitle { font-size: 18px; }
+    h2.part-title { font-size: 24px; }
+    body { font-size: 17px; }
+    .phase, .step, nav.toc { padding: 20px 18px; }
+    .phase-num { font-size: 24px; }
+    .phase-name { font-size: 22px; }
+  }
+
+  /* PRINT */
+  @media print {
+    body { background: white; font-size: 11pt; }
+    body::before { display: none; }
+    .container { max-width: 100%; padding: 0; }
+    nav.toc { page-break-after: always; }
+    section.part { page-break-before: always; }
+    a { color: var(--ink); border: none; }
+    pre, .callout, .phase, .step, table { page-break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+<!-- MASTHEAD -->
+<header class="masthead">
+  <div class="eyebrow">A Specification</div>
+  <h1 class="title">The <span class="red">Feast</span> System</h1>
+  <p class="subtitle">A design and implementation roadmap for a Mount &amp; Blade II: Bannerlord modification</p>
+  <div class="meta">
+    <span>Version 1.0</span>
+    <span>·</span>
+    <span>Solo Developer Edition</span>
+  </div>
+</header>
+
+<!-- TABLE OF CONTENTS -->
+<nav class="toc">
+  <h2>Contents</h2>
+  <ol>
+    <li><a href="#part-1">Design Vision</a>
+      <ol>
+        <li><a href="#why-feasts">Why Feasts</a></li>
+        <li><a href="#core-principles">Core Principles</a></li>
+      </ol>
+    </li>
+    <li><a href="#part-2">System Architecture</a>
+      <ol>
+        <li><a href="#triggers">Triggers</a></li>
+        <li><a href="#hosting">Hosting</a></li>
+        <li><a href="#invitations">Invitations &amp; RSVPs</a></li>
+        <li><a href="#travel">Travel &amp; Arrival</a></li>
+      </ol>
+    </li>
+    <li><a href="#part-3">The Seven Phases</a>
+      <ol>
+        <li><a href="#phase-1">Arrival &amp; Mingling</a></li>
+        <li><a href="#phase-2">Toasts &amp; Speeches</a></li>
+        <li><a href="#phase-3">Feasting</a></li>
+        <li><a href="#phase-4">Entertainment</a></li>
+        <li><a href="#phase-5">Dancing &amp; Private Conversation</a></li>
+        <li><a href="#phase-6">Confrontations</a></li>
+        <li><a href="#phase-7">Conclusion</a></li>
+      </ol>
+    </li>
+    <li><a href="#part-4">Cross-Cutting Systems</a>
+      <ol>
+        <li><a href="#standing">Social Standing</a></li>
+        <li><a href="#preferences">NPC Preference Profiles</a></li>
+        <li><a href="#tension">Tension Score</a></li>
+        <li><a href="#callbacks">Memorable-Feast Callbacks</a></li>
+      </ol>
+    </li>
+    <li><a href="#part-5">Implementation Roadmap</a>
+      <ol>
+        <li><a href="#calibration">Calibration on Confidence</a></li>
+        <li><a href="#tech-stack">Technical Stack</a></li>
+        <li><a href="#mvp">The Minimum Playable Build</a></li>
+        <li><a href="#phases-impl">Implementation Phases</a></li>
+        <li><a href="#risks">Risk Register</a></li>
+      </ol>
+    </li>
+    <li><a href="#part-6">Open Questions</a></li>
+    <li><a href="#part-7">Out of Scope &amp; Future Work</a></li>
+    <li><a href="#appendix">Appendix: Decisions Log</a></li>
+  </ol>
+</nav>
+
+<!-- ========================= PART I ========================= -->
+<section class="part" id="part-1">
+  <div class="part-marker">Part the First</div>
+  <h2 class="part-title">Design Vision</h2>
+  <div class="part-divider"></div>
+
+  <p class="lede">Bannerlord shipped without feasts, and stripped Warband's courtship system down to a charisma check. The result is a kingdom of nobles who have nothing to do during peace and no rituals through which their relationships are formed. This system restores the missing layer.</p>
+
+  <h3 id="why-feasts"><span class="num">§ I</span> Why Feasts</h3>
+  <p>The complaint most commonly levelled against Bannerlord by long-time fans is that its world is mechanically impressive and emotionally inert. Players cannot name the rulers of factions they have served for years. NPCs feel interchangeable. Late-game tedium sets in by the time a player has founded their own kingdom, because peacetime offers nothing beyond waiting for the next war.</p>
+
+  <p>Feasts solve all three problems with a single system. They are <span class="sc">recurring social events</span> that gather named nobles in a single room, give them reasons to interact, and produce <span class="sc">consequences that persist</span>. A player who has hosted a royal feast and danced with the ruler's daughter remembers it. So does the ruler.</p>
+
+  <h3 id="core-principles"><span class="num">§ II</span> Core Principles</h3>
+
+  <dl>
+    <dt>Feasts are events, not encounters.</dt>
+    <dd>A feast is composed of seven phases occurring over an in-game day or two. It is not a cutscene. The player is present throughout and makes consequential choices in each phase.</dd>
+
+    <dt>Standing is the currency.</dt>
+    <dd>Who you can invite, where you sit, who will dance with you, whose private audience you can request — all are gated by the <span class="sc">social standing</span> system, a composite of clan tier, renown, position, cultural match, and bloodline.</dd>
+
+    <dt>The world keeps moving.</dt>
+    <dd>Feasts do not pause campaign time. Wars can begin, fiefs can be attacked, caravans can be ambushed during a feast. This creates real tension and makes peacetime feel earned rather than guaranteed.</dd>
+
+    <dt>Information is partial, never preview.</dt>
+    <dd>Players choose toasts, dances, and tournament entries based on labels and context, not by previewing the exact text or rolling outcomes in advance. This is the core of replay value: reading the room is the skill.</dd>
+
+    <dt>Failure tolerance is asymmetric.</dt>
+    <dd>The room as a whole is forgiving — a bad toast costs you a few relation points across attendees. Specific targets are harsh — picking the wrong style for the lady you are courting can cost you her favour for the entire feast and beyond.</dd>
+
+    <dt>Persistence over polish.</dt>
+    <dd>What happens at a feast is remembered. NPCs reference notable toasts, duels, and embarrassments months later in dialogue. The feast is not over when you leave the hall.</dd>
+  </dl>
+</section>
+
+<!-- ========================= PART II ========================= -->
+<section class="part" id="part-2">
+  <div class="part-marker">Part the Second</div>
+  <h2 class="part-title">System Architecture</h2>
+  <div class="part-divider"></div>
+
+  <p>Before describing the seven phases of the feast itself, the surrounding architecture must be specified — what causes a feast to be scheduled, who may host one, how guests are invited, and what occurs in the days between invitation and arrival.</p>
+
+  <h3 id="triggers"><span class="num">§ III</span> Triggers</h3>
+
+  <p>With only one to two feasts per kingdom per year, each must have a <em>reason</em>. Random feasts feel hollow; commemorative feasts have weight. The scheduler picks one trigger per kingdom approximately every six months, weighted by what has actually occurred:</p>
+
+  <ul>
+    <li><strong>Coronation</strong> — a new ruler ascends, by election or succession.</li>
+    <li><strong>Victory feast</strong> — the kingdom wins a major war or captures a regional capital.</li>
+    <li><strong>Royal wedding</strong> — any clan-tier-4-or-greater marriage.</li>
+    <li><strong>Treaty / peace celebration</strong> — the end of a long war.</li>
+    <li><strong>Heir's coming-of-age</strong> — a faction leader's child turns eighteen.</li>
+    <li><strong>Player-triggered</strong> — a fief-holding player chooses to host one.</li>
+  </ul>
+
+  <p>Quiet kingdoms may go a year without a feast. Eventful kingdoms may have two within a season. The scheduler maintains a per-kingdom cooldown to prevent feast spam.</p>
+
+  <h3 id="hosting"><span class="num">§ IV</span> Hosting</h3>
+
+  <p>Only fief-holding lords may host. This is a deliberate restriction: it makes feasts <span class="sc">aspirational</span>, and gives landless or low-tier players a reason to attend before they can throw their own. Hosting requires:</p>
+
+  <ul>
+    <li><strong>Peacetime</strong> with at least one neighbouring kingdom (a fully-mobilised kingdom cannot feast).</li>
+    <li><strong>Treasury cost</strong> scaling with guest tier: roughly 5,000 denars for a modest gathering, 50,000 or more for a royal affair.</li>
+    <li><strong>Food stores</strong> drained from the host fief's granary; low granary causes price spikes or quality reductions.</li>
+    <li><strong>Lead time</strong> of seven to fourteen days between invitations and the feast itself, during which guests travel.</li>
+    <li><strong>Influence cost</strong> for non-ruler vassals hosting royal-tier feasts (presumption above one's station).</li>
+  </ul>
+
+  <p>The host configures three things: <span class="sc">guest list</span>, <span class="sc">scale</span> (modest, grand, or royal — affecting cost and prestige), and an optional <span class="sc">theme</span> tied to the trigger event. The hall scene used is the existing vanilla lord hall of the host fief; capacity scales with fief size:</p>
+
+  <table>
+    <thead>
+      <tr><th>Fief</th><th>Max Guests</th><th>Notes</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Castle (small)</td><td>8</td><td>Modest only</td></tr>
+      <tr><td>Castle (large) / Town keep</td><td>20</td><td>Modest or grand</td></tr>
+      <tr><td>Capital city</td><td>30+</td><td>Any scale, including royal</td></tr>
+    </tbody>
+  </table>
+
+  <p>Each invited lord brings one to three family members within the cap. This makes capital cities meaningfully better venues — a tangible reason to want one.</p>
+
+  <h3 id="invitations"><span class="num">§ V</span> Invitations &amp; RSVPs</h3>
+
+  <p>This is where the social mechanics of the system earn their keep. When invitations go out, each invited clan independently decides whether to attend. The decision is driven by:</p>
+
+  <ul>
+    <li>Relation with host (primary factor)</li>
+    <li>Distance from host fief</li>
+    <li>Current war or siege engagements</li>
+    <li>Presence of rivals on the guest list</li>
+    <li>Clan personality (some lords are reclusive, some are social)</li>
+  </ul>
+
+  <p>RSVPs arrive as map notifications over two to three days, giving the player time to react. <em>Lord Y declined — should I bribe him? Lady Z accepted, but so did her rival — drama is brewing.</em> Snubs work both ways: failing to invite an allied clan is a relation hit, while failing to invite a rival is fine and expected.</p>
+
+  <p>Enemy kingdoms can never attend; the war state precludes it. During peace, cross-kingdom invitations are possible and prestigious. Inviting a neutral kingdom's leader to your feast is a <em>diplomatic statement</em>.</p>
+
+  <h3 id="travel"><span class="num">§ VI</span> Travel &amp; Arrival</h3>
+
+  <p>Guests travel as small parties on the campaign map heading toward the host fief. This creates emergent stakes:</p>
+
+  <ul>
+    <li>Bandits or hostile clans may ambush travelling guests. A guest dying en route is a <em>story moment</em>.</li>
+    <li>Late guests miss key activities; very late ones miss the feast entirely.</li>
+    <li>The player may choose to escort important guests, gaining significant relation.</li>
+  </ul>
+
+  <p>When guests arrive at the fief, they remain there until the feast ends. The town or castle scene is repopulated with their notable characters walking around — already good ambience before the feast itself begins.</p>
+</section>
+
+<!-- ========================= PART III ========================= -->
+<section class="part" id="part-3">
+  <div class="part-marker">Part the Third</div>
+  <h2 class="part-title">The Seven Phases</h2>
+  <div class="part-divider"></div>
+
+  <p>The feast unfolds across seven phases over an in-game day or two, each with its own activities, dialogue depth, and consequences. The player advances between phases via the host menu (when hosting) or follows the host's schedule (when attending). Each phase passes state to the next; what happened in Phase 2 affects what is possible in Phase 5.</p>
+
+  <p>The phases share an architectural pattern: an <span class="sc">interaction menu</span>, gated <span class="sc">dialogue categories</span>, capped <span class="sc">relation deltas</span> per phase, and explicit <span class="sc">state passed forward</span> to subsequent phases. Once Phase 1's structure is implemented, the others reuse the same scaffolding with their own twist.</p>
+
+  <!-- PHASE 1 -->
+  <article class="phase" id="phase-1">
+    <div class="phase-header">
+      <span class="phase-num">I.</span>
+      <span class="phase-name">Arrival &amp; Mingling</span>
+    </div>
+    <p class="phase-tagline">Guests arrive. Greetings are exchanged. The room takes shape.</p>
+
+    <h5>Setting</h5>
+    <p>The player spawns at the hall entrance as host, or near the door as guest. All RSVP'd attendees who have already arrived are present, walking and standing in the hall. Late guests trickle in throughout the phase. Host's family members are present. Servants move with platters; a hired minstrel may play in the corner.</p>
+
+    <h5>Player interactions</h5>
+    <p><strong>If hosting:</strong></p>
+    <ul>
+      <li>Greet arriving guests — auto-prompted dialogue when each guest enters. Mandatory; skipping causes a relation hit. Brief exchange (three to four lines), small relation gain.</li>
+      <li>Move freely between guests; click any to initiate dialogue.</li>
+      <li>Open host menu to advance to Phase 2, check guest list, view RSVPs, or dismiss the feast early (with consequences).</li>
+    </ul>
+
+    <p><strong>If attending:</strong></p>
+    <ul>
+      <li>Greet host — first action, auto-prompted, +2 relation with host.</li>
+      <li>Greet host's family — optional, +1 each.</li>
+      <li>Move freely between guests.</li>
+      <li>Leave early — possible but a heavy relation hit with host.</li>
+    </ul>
+
+    <h5>Dialogue categories</h5>
+    <ol>
+      <li><strong>Pleasantries.</strong> Available with any guest, always. Light relation gain (+1), no risk. Cap of one to two pleasantry exchanges per guest per phase.</li>
+      <li><strong>Topical conversation.</strong> Gated by mutual interests (each lord has two to three interest tags: war, trade, hunting, scholarship, religion, intrigue). Shared interest unlocks deeper topics: +2 relation, possible quest hook or rumour. Clashing interest applied wrongly: −1 relation. <em>This is also where introduction quests fire — the intermediary you have been befriending finally walks you over to your courtship target.</em></li>
+      <li><strong>Strategic conversation.</strong> Gated by clan tier and standing. Diplomacy, recruitment, conspiracy. Mostly stubbed in v1 to seed v2 content.</li>
+    </ol>
+
+    <h5>Relation math</h5>
+    <p>+1 for pleasantries, +2 for topical match, −1 for topical clash. Capped at +5 / −3 with any single guest in this phase. The phase is not meant to be a relation farm — that is what the entire feast is for, distributed across phases.</p>
+
+    <h5>State produced</h5>
+    <ul>
+      <li>List of guests greeted</li>
+      <li>List of guests with conversation completed (caps later relation gain)</li>
+      <li>Tension pairs flagged (for Phase 6)</li>
+      <li>Active romance partners flagged (for Phase 5)</li>
+      <li>Quest hooks accepted or refused</li>
+    </ul>
+
+    <h5>Scope</h5>
+    <p><span class="tag v1">v1</span> All of the above. <span class="tag v2">v2</span> Strategic conversation depth (recruitment dialogues, conspiracy stubs become real branching). <span class="tag v3">v3</span> Per-culture greeting flavour.</p>
+  </article>
+
+  <!-- PHASE 2 -->
+  <article class="phase" id="phase-2">
+    <div class="phase-header">
+      <span class="phase-num">II.</span>
+      <span class="phase-name">Toasts &amp; Speeches</span>
+    </div>
+    <p class="phase-tagline">A sequence of toasts in order of precedence. Composition is style × subject. Reading the room is everything.</p>
+
+    <h5>Composition system</h5>
+    <p>Each toast is composed of one <span class="sc">subject</span> and one <span class="sc">style</span>, picked from menus without preview of the actual text.</p>
+
+    <p><strong>Subjects (v1):</strong> the host · the occasion · fallen kin / the departed · the realm or kingdom · a specific person present · the future.</p>
+    <p><strong>Styles (v1):</strong> solemn · boastful · witty · humble · romantic.</p>
+
+    <p>Six subjects × five styles = thirty cells. Each cell has two to three written variants, for a total of seventy-five to ninety unique toast strings. These are short — three to five sentences each — and constitute a substantial but tractable v1 content task.</p>
+
+    <h5>What makes a toast land</h5>
+    <p>Three layered factors determine reception:</p>
+    <ol>
+      <li><strong>Subject appropriateness.</strong> Each feast trigger has an appropriateness map. Toasting fallen kin at a wedding is jarring unless culturally appropriate. Toasting the future at a funeral feast is offensive.</li>
+      <li><strong>Style appropriateness.</strong> Each subject pairs naturally with certain styles. Fallen kin demands solemn or humble; witty is offensive. Heirs and the future welcome romantic or boastful; solemn is heavy-handed.</li>
+      <li><strong>Personal preferences of key listeners.</strong> Every notable NPC has hidden style preferences. A lady who prefers solemn courtly style remembers a solemn toast favourably even if the room was boastful. This is the same axis system used in courtship (when the marriage system arrives).</li>
+    </ol>
+
+    <h5>Skill check on delivery</h5>
+    <p>Composition determines content; <span class="sc">Charm</span> determines delivery. Even mediocre composition lands acceptably with high Charm. Even great composition can flop with low Charm.</p>
+
+    <h5>Player UI</h5>
+    <pre><code>Step 1: What will you toast?
+  > The host's hospitality
+  > Our victory at [battle name]
+  > Those who fell at [battle name]
+  > The kingdom of [name]
+  > [specific guest's name]
+  > Whatever comes next for our houses
+
+Step 2: How will you say it?
+  > With solemn weight     [Solemn]
+  > With proud fire        [Boastful]
+  > With clever humour     [Witty]
+  > With humble grace      [Humble]
+  > With poetic flourish   [Romantic]</code></pre>
+
+    <p>The labels give enough information to make a tactical choice. The exact words are the reveal.</p>
+
+    <h5>Listening to others' toasts</h5>
+    <ul>
+      <li><strong>Raise glass and drink</strong> — default, polite, neutral.</li>
+      <li><strong>Cheer loudly</strong> — boosts speaker's renown gain, +1 relation, mild risk if the toast was bad (you look like a sycophant).</li>
+      <li><strong>Stay silent / refuse to drink</strong> — only available if the toast genuinely insulted you; major relation hit with speaker but a <em>statement</em>.</li>
+    </ul>
+
+    <h5>Failure model (asymmetric)</h5>
+    <table>
+      <thead><tr><th>Severity</th><th>Effect</th></tr></thead>
+      <tbody>
+        <tr><td>Room-wide bad</td><td>−1 to −2 relation with all attendees, −5 to −15 renown. Recoverable.</td></tr>
+        <tr><td>Targeted listener bad</td><td>−5 to −15 with the specific NPC, "memorable embarrassment" flag for ~1 in-game year. Not recoverable this feast.</td></tr>
+        <tr><td>Critical failure</td><td>−20 renown, −5 with all attendees, −15 with host, NPC dialogue references for months. Caps near 1% probability.</td></tr>
+      </tbody>
+    </table>
+
+    <h5>Scope</h5>
+    <p><span class="tag v1">v1</span> Full grid, all reactions, listening interactions, ruler-present modifier, Charm checks. <span class="tag v2">v2</span> Drunken NPC toasts, mid-feast initiative toasts, full memorable callbacks, cultural background modifiers. <span class="tag v3">v3</span> Per-culture toast variants, named-toast callback dialogue.</p>
+  </article>
+
+  <!-- PHASE 3 -->
+  <article class="phase" id="phase-3">
+    <div class="phase-header">
+      <span class="phase-num">III.</span>
+      <span class="phase-name">Feasting</span>
+    </div>
+    <p class="phase-tagline">Seated at the tables. The longest phase. Where Warband-style hall conversations live.</p>
+
+    <h5>Seating</h5>
+    <p>Before Phase 3 begins, the host arranges seating. For player-hosts, this is a real decision with downstream effects via a drag-and-drop UI showing the high table and side tables. Constraints surface live:</p>
+    <ul>
+      <li><strong>Place of honour</strong> (right of host) — major prestige to whoever sits there. Snubs everyone else if not the highest-ranking guest.</li>
+      <li><strong>Tension flags</strong> — seating two enemies adjacent triggers a UI warning; confrontation probability spikes.</li>
+      <li><strong>Romance flags</strong> — seating you next to a courtship target advances romance, but is also a public statement.</li>
+      <li><strong>Cultural mixing</strong> — small relation deltas based on whether cultures clash or harmonise.</li>
+    </ul>
+    <p>For player-attendees, the host's NPC seating logic places you according to standing. Below a threshold, you are not seated at all — you stand and eat with the household, a major status signal.</p>
+
+    <h5>Seated dialogue</h5>
+    <p>Each seat has one to three dialogue partners (neighbours, across the table). Walking to far tables is allowed but socially costly with assigned neighbours.</p>
+
+    <ol>
+      <li><strong>Personal stories.</strong> The partner shares something about their past. Player picks response style (sympathetic / curious / dismissive / one-upping). Right response: +3 to +5. Wrong: relation hit.</li>
+      <li><strong>Opinions on others.</strong> Gossip about guests or absent lords. Agree, disagree, or deflect. <em>Intelligence-gathering as mechanic</em> — you learn the social map of the kingdom.</li>
+      <li><strong>Confessions and secrets.</strong> Gated by relation 50+ and trust. A drunk lord may reveal grievances, debts, feuds. Quest hooks. Stubbed in v1.</li>
+      <li><strong>Romance dialogue.</strong> If seated next to a courtship target, deeper romance unlocks here. Poetry recitation fires here when the marriage system arrives.</li>
+      <li><strong>Banter.</strong> Light, low-stakes. Useful with low-relation guests.</li>
+    </ol>
+
+    <h5>Drinking games</h5>
+    <p>Opt-in minigame at the table. Wager (denars or pledge), opposed roll on Vigor + Endurance with random variance, three to five rounds, fold or push.</p>
+
+    <table>
+      <thead><tr><th>Outcome</th><th>Effect</th></tr></thead>
+      <tbody>
+        <tr><td>Win</td><td>Collect wager, small renown, +1 relation with opponent, mild buff with watching guests.</td></tr>
+        <tr><td>Lose gracefully (folded early)</td><td>Pay wager. Neutral.</td></tr>
+        <tr><td>Lose badly (pushed and lost)</td><td>Pay wager, renown loss, "drunken fool" flag for the rest of the feast.</td></tr>
+      </tbody>
+    </table>
+
+    <p>Hard cap of two contests per feast. Proposing to a teetotaller is a relation hit. Refusing a contest framed as a challenge to honour is a relation hit. Unavailable during somber feast types.</p>
+
+    <h5>Scope</h5>
+    <p><span class="tag v1">v1</span> Seating UI, all five dialogue categories (confessions stubbed), drinking games full, tension carry-forward. <span class="tag v2">v2</span> Full confessions/secrets, intelligence-gathering UI, quest hooks from dialogue, "as I told you at the feast" callbacks. <span class="tag v3">v3</span> Pledged-favour drinking wagers, table-hopping consequences modelling.</p>
+  </article>
+
+  <!-- PHASE 4 -->
+  <article class="phase" id="phase-4">
+    <div class="phase-header">
+      <span class="phase-num">IV.</span>
+      <span class="phase-name">Entertainment</span>
+    </div>
+    <p class="phase-tagline">An optional tournament. Public stage for reputation. The political class is the audience.</p>
+
+    <h5>Why tournaments at feasts</h5>
+    <p>Two reasons earn this phase its scope: it reuses Bannerlord's existing arena code (tournaments are not built from scratch), and the audience is the <span class="sc">political class</span>. Winning a regular tournament gets you renown. Winning a feast tournament gets you renown <em>plus</em> relation gains with every attending lord, plus eligibility flags for romance, recruitment, and patronage.</p>
+
+    <h5>Format</h5>
+    <p>Host picks one of two formats in v1: <strong>melee</strong> (default for most feasts) or <strong>archery contest</strong> (Battanian default). Royal feasts may include both, with separate winners and separate champion's privileges.</p>
+
+    <h5>Archery contest</h5>
+    <p>Five shots per competitor. Bullseye = 10 points · inner = 7 · mid = 5 · outer = 3 · hit = 1 · miss = 0. Two-round format: qualifier (everyone shoots, top 4 advance) and final (top 4 shoot, highest score wins). Sudden-death single-shot tiebreakers. Total time roughly five in-game minutes — much faster than a full melee bracket.</p>
+
+    <h5>Player participation</h5>
+    <ol>
+      <li><strong>Compete</strong> — enter the bracket. Standard arena combat (melee) or aimed shots (archery).</li>
+      <li><strong>Watch</strong> — spectate. Dialogue with other spectators. Light betting available.</li>
+      <li><strong>Decline visibly</strong> — sit it out. Mild relation hit with martial-personality guests at melee tournaments; <em>archery is socially neutral to decline</em> outside Battanian feasts.</li>
+      <li><strong>Withdraw mid-tournament</strong> — yield. Costs renown but avoids worse outcomes.</li>
+    </ol>
+
+    <h5>Outcomes</h5>
+    <dl>
+      <dt>Player wins</dt>
+      <dd>Major renown, +5 with host, +2 with all attendees, eligibility flag with all attending clans, champion's privilege (present the prize to a chosen attendee for +10 with them and their clan), "Champion of [feast name]" tag for ~6 months.</dd>
+      <dt>Player loses</dt>
+      <dd>Small renown loss if eliminated early; small renown gain if reached semifinals. +1 relation with the lord who defeated you. No public consequence.</dd>
+      <dt>Player declines</dt>
+      <dd>Mild martial-personality relation hits at melee; nothing at archery (outside Battania).</dd>
+      <dt>NPC wins</dt>
+      <dd>Player can congratulate them in Phase 5 for relation gain. A <em>rival</em> winning is a flag — they may use champion's privilege to honour your courtship target, escalating Phase 6 confrontation odds.</dd>
+    </dl>
+
+    <h5>Scope</h5>
+    <p><span class="tag v1">v1</span> Optional toggle, melee and archery, full participation choices, all outcomes including champion's privilege, ruler-watches convention. <span class="tag v2">v2</span> Joust format, mixed format for royal feasts, ruler-competes events, full feud-pair bracket interactions. <span class="tag v3">v3</span> Per-culture tournament flavour, spectator betting depth.</p>
+  </article>
+
+  <!-- PHASE 5 -->
+  <article class="phase" id="phase-5">
+    <div class="phase-header">
+      <span class="phase-num">V.</span>
+      <span class="phase-name">Dancing &amp; Private Conversation</span>
+    </div>
+    <p class="phase-tagline">The room loosens. Tables clear. Conversations become personal. The intimate phase.</p>
+
+    <h5>Setting</h5>
+    <p>Tables moved aside, central floor opened, smaller knots of guests around the periphery, some retiring to alcoves and balconies for private talks. Lighting dims (script). Background music continuous (existing tavern minstrel audio repurposed). The vanilla lord hall already has alcoves and side spaces usable as private-conversation zones without authoring new geometry.</p>
+
+    <h5>Dancing — abstracted</h5>
+    <p>Real dance animations are out of scope. Stylised abstraction instead:</p>
+    <ul>
+      <li>Player approaches an attendee: <em>"May I have this dance?"</em></li>
+      <li>They accept or decline (relation, romance status, prior promise).</li>
+      <li>Brief fade-to-text scene with single illustration.</li>
+      <li>During the dance, a short three-to-four-line dialogue plays.</li>
+      <li>Player picks a tone (light banter / earnest / bold).</li>
+      <li>Tone matched against partner's preferences (same axes as toasts).</li>
+      <li>Outcome: +2 to +6 relation, romance progress if applicable, possible small renown.</li>
+    </ul>
+
+    <p><strong>Limits:</strong> one dance per partner per feast. Two to three dances total per phase. Dancing with a married NPC's spouse without tacit approval flags jealousy.</p>
+
+    <h5>Private conversations</h5>
+    <p>Side rooms and alcoves enable longer, deeper exchanges than Phase 3's seated dialogue.</p>
+
+    <ol>
+      <li><strong>Full romance scenes</strong> — confession, exchange of tokens, plans for future meetings. <em>Romance climax window</em>: with sufficient prior progress, courtship can formally advance to betrothal here.</li>
+      <li><strong>Conspiracy and recruitment</strong> — disaffected vassals propose defection. Stubbed in v1.</li>
+      <li><strong>Quest hand-offs</strong> — friendly lord asks a personal favour in private.</li>
+      <li><strong>Apologies and reconciliations</strong> — Charm-driven repair attempts with low-relation NPCs.</li>
+      <li><strong>Player-side confessions</strong> — admitting weakness, requesting patronage.</li>
+    </ol>
+
+    <h5>The romance climax window</h5>
+    <p>This is the seam where feasts hand off to the marriage system (built later). With sufficient prior relation and romance progress, the player may formally declare intentions in private conversation. If accepted, a follow-up flag is set: the player must approach her guardian within thirty in-game days for the betrothal to hold.</p>
+
+    <h5>Slot system</h5>
+    <p>The player has <strong>three private-conversation slots</strong> in Phase 5. Once spent, mingling continues but no further private exchanges may be initiated. NPCs who seek out the player do not consume slots — those are free events. The player must choose: romance target, mysterious vassal, old friend with quest, rival to reconcile?</p>
+
+    <h5>Scope</h5>
+    <p><span class="tag v1">v1</span> Stylised dance with tone-matching, full private system, romance hooks (stubbed for marriage), apology/reconciliation, quest hand-offs, conspiracy stubs. <span class="tag v2">v2</span> Multiple dance types with different tone-preferences, full conspiracy/recruitment, jealousy event modelling. <span class="tag v3">v3</span> Per-culture dance flavour, expanded private locations.</p>
+  </article>
+
+  <!-- PHASE 6 -->
+  <article class="phase" id="phase-6">
+    <div class="phase-header">
+      <span class="phase-num">VI.</span>
+      <span class="phase-name">Confrontations</span>
+    </div>
+    <p class="phase-tagline">The hour is late. Wine has flowed. What was suppressed earlier surfaces now.</p>
+
+    <h5>Tension score</h5>
+    <p>An internal score accumulates across the feast and resolves here:</p>
+    <ul>
+      <li>Pre-existing rivalry (relation &lt; −30): +1 base per pair</li>
+      <li>Adjacent seating of enemies in Phase 3: +2</li>
+      <li>Bad toast targeting someone present: +1</li>
+      <li>Tournament: losing badly to a rival: +1</li>
+      <li>Champion honoured your courtship target: +2</li>
+      <li>Dancing with someone's spouse: +2</li>
+      <li>Drunken-fool flag set: tension contributions doubled</li>
+      <li>Drinking-game humiliation: +1</li>
+      <li>Public refusal to drink to a toast: +2</li>
+    </ul>
+
+    <h5>Probability formula</h5>
+    <pre><code>P(confrontation) = min(0.85,
+                       tension_score × 0.15
+                     + base_personality_modifier)</code></pre>
+
+    <p>Tension 4 ≈ 60% probability. Tension 1 ≈ 15%. Hot-headed lords skew higher; self-controlled lords lower. <strong>At most one to two confrontations per feast</strong>, picking the highest-probability rolls; lower pairs receive a "tension simmered" flag instead.</p>
+
+    <h5>Tension visibility (the (c) hybrid)</h5>
+    <p>Throughout the feast, the player sees tension flags on NPC portraits — they know <em>who</em> is at risk and the contributing factors. They do <em>not</em> see the final probability roll. They know the dice exist; they don't see them land.</p>
+
+    <h5>Pre-confrontation intervention</h5>
+    <p>An opening interval of about five in-game minutes opens Phase 6. If the player noticed tension earlier, they may:</p>
+    <ol>
+      <li><strong>Mediate</strong> — Charm-based defuse attempt. Success: tension drops. Failure: tension stays, mediator may catch heat.</li>
+      <li><strong>Separate</strong> — quietly guide one party away. Reduces tension by 1, costs influence or a small relation hit.</li>
+      <li><strong>Provoke</strong> — actively push toward confrontation. Risky and implicates the player.</li>
+    </ol>
+    <p>Players who weren't paying attention have no opening interval. Engagement is rewarded.</p>
+
+    <h5>Confrontation types</h5>
+
+    <h5 style="color:var(--ink-soft); font-style:italic;">Type A — Verbal exchange (~50%)</h5>
+    <p>Two lords trade insults. Player options if involved: take a side · mediate (Charm check) · mock both · stay out. Resolves on its own without intervention: both parties drop −3 relation, no further consequences.</p>
+
+    <h5 style="color:var(--ink-soft); font-style:italic;">Type B — Public challenge to duel (~30%)</h5>
+    <p>The argument escalates. By feast etiquette, duels are <em>not fought at the feast</em> — they are scheduled for dawn outside the walls. Player options: accept (refusing is a major honour hit) · issue · withdraw (high Charm + consent) · champion (third party fights in stead). The duel itself reuses existing Bannerlord duel mechanics. <strong>Death of a clan tier 4+ noble at your feast is a major political event</strong> — −10 relation with all attendees as host, possible succession crisis if a ruler or heir.</p>
+
+    <h5 style="color:var(--ink-soft); font-style:italic;">Type C — Brawl (~15%)</h5>
+    <p>Tempers snap. The hall erupts. Host options: Charm + Leadership check to restore order (success: order, both ejected, −5 with both; failure: brawl spreads, feast ends in disgrace, "the disastrous feast at [fief]" tag for years). Brawls almost always end the feast immediately, skipping Phase 7's normal flow.</p>
+
+    <h5 style="color:var(--ink-soft); font-style:italic;">Type D — Public revelation (~5%, dramatic)</h5>
+    <p>Rare special-case requiring high tension and a flagged secret on one party. Public outing. Massive long-term political consequences. <strong>Stubbed in v1 as flavour text only</strong>; full branching is v2/v3 work pending the conspiracy/secrets system.</p>
+
+    <h5>Host authority</h5>
+    <p>The host carries social weight as the room's authority figure:</p>
+    <ul>
+      <li><strong>Demand silence</strong> — Leadership check, ends Type A immediately, reduces escalation odds for B.</li>
+      <li><strong>Eject a party</strong> — major relation hit with ejected party, but ends the confrontation.</li>
+      <li><strong>Take the brawl outside</strong> — for Type C, redirects chaos out of the hall, contains damage.</li>
+    </ul>
+
+    <h5>Scope</h5>
+    <p><span class="tag v1">v1</span> Tension system, visible flags, intervention window, Types A and B in full, Type C with simplified resolution, Type D as flavour stub, host authority, duel scheduling using existing mechanics. <span class="tag v2">v2</span> Full Type C brawl spreading, Type D revelation branching, conspiracy/secrets integration, cultural confrontation norms, ruler-involved confrontations. <span class="tag v3">v3</span> Long-term reputation tracking affecting future feast invitations, kingdom-wide political fallout.</p>
+  </article>
+
+  <!-- PHASE 7 -->
+  <article class="phase" id="phase-7">
+    <div class="phase-header">
+      <span class="phase-num">VII.</span>
+      <span class="phase-name">Conclusion</span>
+    </div>
+    <p class="phase-tagline">A reflective close. The host's last word multiplies what came before.</p>
+
+    <h5>Setting</h5>
+    <p>The hour is very late. Most guests are tired but still present. Servants clear the last of the food. The minstrel has stopped or plays only soft, slow music. The mood has shifted from Phase 5/6's looseness to something reflective.</p>
+
+    <h5>The closing toast</h5>
+    <p>Reuses Phase 2's composition engine with a modified subject list:</p>
+    <ol>
+      <li><strong>Gratitude to guests</strong> — the safe pick.</li>
+      <li><strong>Reflection on the night</strong> — naming a memorable moment (requires the system to surface Phase 2-6 events).</li>
+      <li><strong>The road ahead</strong> — looking forward.</li>
+      <li><strong>A specific person honoured</strong> — risky; singling out at the end excludes everyone else from the closing focus.</li>
+      <li><strong>Lament or remembrance</strong> — somber close. Appropriate at funeral feasts; jarring at celebratory ones.</li>
+    </ol>
+    <p>Style options unchanged from Phase 2, but <em>boastful</em> is flagged risky — late-night boasting reads as drunken arrogance.</p>
+
+    <h5>Multiplier on outcomes</h5>
+    <table>
+      <thead><tr><th>Closing toast quality</th><th>Effect on accumulated outcomes</th></tr></thead>
+      <tbody>
+        <tr><td>Good</td><td>+20% positive amplification. Guests carry this <em>feeling</em> home as their dominant memory.</td></tr>
+        <tr><td>Mediocre</td><td>Neutral. Outcomes resolve as accumulated.</td></tr>
+        <tr><td>Bad</td><td>−20% on positives, +20% on negatives. The last impression carries.</td></tr>
+        <tr><td>Critical failure</td><td>Large renown loss, "ended his own feast badly" tag. ~1% probability.</td></tr>
+      </tbody>
+    </table>
+
+    <h5>The outcomes screen</h5>
+    <p>Sections in suggested order:</p>
+    <ol>
+      <li><strong>Header</strong> — feast name, host, scale, trigger.</li>
+      <li><strong>Relations changed</strong> — per-attendee, sorted by magnitude, brief reason for each delta.</li>
+      <li><strong>Renown and influence</strong> — total with breakdown.</li>
+      <li><strong>Notable events</strong> — duels challenged, tournament champions, dances danced, secrets confessed.</li>
+      <li><strong>Outstanding obligations</strong> — quests accepted, duels scheduled, romance progress flags, return invitations owed.</li>
+      <li><strong>Cost summary</strong> (host only) — denars, food. Was the feast worth it?</li>
+    </ol>
+
+    <h5>Long-term consequences</h5>
+    <ul>
+      <li><strong>Memorable feast tag</strong> — exceptionally good or bad feasts are remembered. NPCs reference them in dialogue for 6-12 months.</li>
+      <li><strong>Standing changes</strong> — successful royal feasts permanently boost host standing; disasters do the inverse.</li>
+      <li><strong>Romance flags</strong> — courtship advanced here continues progressing on the campaign map.</li>
+      <li><strong>Conspiracy seeds</strong> — anything started in Phase 5 carries forward.</li>
+      <li><strong>Duels scheduled</strong> — fire as a separate event the next dawn.</li>
+      <li><strong>Quests accepted</strong> — appear in the player's quest log.</li>
+    </ul>
+
+    <h5>Scope</h5>
+    <p><span class="tag v1">v1</span> Closing toast (5 subjects × 5 styles), outcomes multiplier, full outcomes screen, persistent flags, departure handling, war-interrupt handling. <span class="tag v2">v2</span> Travel ambushes for departing guests, "recently hosted" fief status, named-feast callbacks. <span class="tag v3">v3</span> Cultural variants on closing-toast conventions.</p>
+  </article>
+</section>
+
+<!-- ========================= PART IV ========================= -->
+<section class="part" id="part-4">
+  <div class="part-marker">Part the Fourth</div>
+  <h2 class="part-title">Cross-Cutting Systems</h2>
+  <div class="part-divider"></div>
+
+  <p>Several systems thread through every phase and must be designed once, used everywhere. They are described here so they need not be re-specified within each phase.</p>
+
+  <h3 id="standing"><span class="num">§ VII</span> Social Standing</h3>
+
+  <p>Standing gates access to feasts (invitations), seating placement within them, and which dialogue options are available. It is composed of:</p>
+
+  <table>
+    <thead><tr><th>Component</th><th>Source</th><th>Weight</th></tr></thead>
+    <tbody>
+      <tr><td>Clan tier</td><td>vanilla 0–6</td><td>Primary — sets the bracket</td></tr>
+      <tr><td>Renown</td><td>vanilla</td><td>Refines within the bracket</td></tr>
+      <tr><td>Position</td><td>landless / vassal / fief-holder / ruler</td><td>Modifier</td></tr>
+      <tr><td>Cultural match</td><td>same / different culture from host</td><td>Modifier on dialogue and seating</td></tr>
+      <tr><td>Bloodline</td><td>chargen backstory</td><td>Floor — opens doors above current tier</td></tr>
+    </tbody>
+  </table>
+
+  <p>Rolled into four standing tiers:</p>
+  <ol>
+    <li><strong>Commoner</strong> — no clan or tier 0. Cannot attend feasts at all (turned away by retainers).</li>
+    <li><strong>Aspirant</strong> — tier 1, low renown. May attend modest feasts of minor lords. Ladies require formal introduction.</li>
+    <li><strong>Established</strong> — tier 2–3, decent renown. Most feasts accessible. Romance dialogue gated by venue type, not gender.</li>
+    <li><strong>Magnate</strong> — tier 4+. Doors open everywhere, including ruler audiences.</li>
+  </ol>
+
+  <p><strong>Introduction chains</strong> are the escape valve: every higher-tier lord has intermediaries (vassals, kin, retainers) who can introduce a lower-standing player after sufficient befriending. This turns the social map into a navigation puzzle.</p>
+
+  <p><strong>Patronage</strong> — a higher-tier lord may formally sponsor the player after exceptional service, granting a temporary standing boost in their sphere. This gives landless players a meaningful progression arc.</p>
+
+  <p><strong>Overreach consequences</strong> are public and graduated: first offence is a quiet refusal; persistence brings mockery and renown loss; egregious cases (a Commoner demanding audience with a Magnate) trigger humiliation events.</p>
+
+  <h3 id="preferences"><span class="num">§ VIII</span> NPC Preference Profiles</h3>
+
+  <p>Every notable NPC has hidden style preferences across the same five-axis system used for toasts, dance tones, and (later) courtship poetry. The axes are:</p>
+
+  <table>
+    <thead><tr><th>Axis</th><th>What appeals to a lord/lady favouring this style</th></tr></thead>
+    <tbody>
+      <tr><td>Solemn</td><td>Gravity, ceremony, ancestral weight, religious formality.</td></tr>
+      <tr><td>Boastful</td><td>Martial pride, glory, prowess, public recognition.</td></tr>
+      <tr><td>Witty</td><td>Cleverness, irreverence, lightness, sharp tongue.</td></tr>
+      <tr><td>Humble</td><td>Modesty, deference, self-effacement, quiet virtue.</td></tr>
+      <tr><td>Romantic</td><td>Poetic flourish, emotional heightening, courtly ardour.</td></tr>
+    </tbody>
+  </table>
+
+  <p>Each NPC has a <strong>primary preference</strong> (style they strongly favour) and an <strong>aversion</strong> (style that actively offends them). Other styles are neutral. This is a 5×5 matrix per NPC, but with most cells neutral, it can be stored compactly: two enum values plus a strength weight.</p>
+
+  <p>Preferences are revealed indirectly through dialogue with siblings, handmaidens, retainers, and friends — never directly displayed in the NPC's encyclopedia entry. The player must invest in social legwork to learn them. A lord's preferences may be hinted by his personality traits in vanilla (Honor → Solemn affinity; Mercy → Humble; Calculating → Witty; Valour → Boastful).</p>
+
+  <h3 id="tension"><span class="num">§ IX</span> Tension Score</h3>
+
+  <p>Defined fully under <a href="#phase-6">Phase 6</a>. Carried as a per-pair integer accumulating from sources distributed across earlier phases. Visible to the player as flags on NPC portraits; hidden in its final probability roll.</p>
+
+  <h3 id="callbacks"><span class="num">§ X</span> Memorable-Feast Callbacks</h3>
+
+  <p>The system that allows NPCs to reference past feasts in future dialogue. Mechanically:</p>
+
+  <ul>
+    <li>Feasts that produce notable events (exceptional toasts, scheduled duels, brawls, public revelations, tournament championships, romance climaxes) write to a <strong>persistent feast log</strong> per save.</li>
+    <li>Each entry has a tag, participants, location, severity, and an expiry (typically 6-12 in-game months for routine entries; permanent for catastrophes).</li>
+    <li>NPC dialogue trees gain conditional lines that fire when the player and an NPC have a shared feast log entry. <em>"I remember your toast at Pravend — it stays with me."</em> · <em>"The night Lord X was challenged at your hall is still spoken of."</em></li>
+    <li>Catastrophes ("the disastrous feast at [fief]") affect future RSVP probability — lords are less willing to attend a host with a recent disaster on his record.</li>
+  </ul>
+
+  <p>This is the system that makes feasts <em>matter beyond the night they occur</em>. Without it, the feast is a forgotten cutscene. With it, the feast is a thread in the campaign's emergent narrative.</p>
+</section>
+
+<!-- ========================= PART V ========================= -->
+<section class="part" id="part-5">
+  <div class="part-marker">Part the Fifth</div>
+  <h2 class="part-title">Implementation Roadmap</h2>
+  <div class="part-divider"></div>
+
+  <p>The design above is approximately three to five months of solo development at full-time pace, or six to nine months at consistent part-time. This section breaks the work into ordered phases, identifies risks honestly, and proposes a minimum playable build that gets you into testing as fast as possible.</p>
+
+  <h3 id="calibration"><span class="num">§ XI</span> Calibration on Confidence</h3>
+
+  <div class="callout warn">
+    <span class="callout-label">Honesty Check</span>
+    <p>I am confident on Bannerlord's general modding architecture (C# with Harmony, <code>CampaignBehaviorBase</code>, <code>MissionBehavior</code>, the dialogue system using XML and conditions/consequences, save data via <code>SyncData</code>). I am <strong>not confident</strong> on exact namespace paths, specific event names, internals of the romance and tournament systems, or the precise way to hook into seated dialogue mid-mission. Where I name a class or event below, treat it as a hypothesis to verify, not a citation. The reliable path forward is to decompile <code>TaleWorlds.CampaignSystem.dll</code> with dnSpy or ILSpy, and reference the source of existing mods that touch related systems.</p>
+  </div>
+
+  <p>Mods worth reading source for, before writing your own:</p>
+  <ul>
+    <li><strong>Diplomacy</strong> — reference for kingdom-level events, alliance/peace mechanics, and persistent kingdom data.</li>
+    <li><strong>Family Tree</strong> — reference for hero relationship data and persistent flags on heroes.</li>
+    <li><strong>Improved Garrisons</strong> — reference for clean <code>CampaignBehaviorBase</code> patterns and MCM integration.</li>
+    <li><strong>Bannerlord Tweaks / BannerLib</strong> — reference for Harmony patch patterns and common pitfalls.</li>
+    <li><strong>Adonnay's Troop Changer</strong> or any custom-mission mod — reference for spawning agents into existing scenes.</li>
+  </ul>
+
+  <h3 id="tech-stack"><span class="num">§ XII</span> Technical Stack</h3>
+
+  <dl>
+    <dt>Language</dt><dd>C# (.NET) targeting whatever framework version the current Bannerlord build expects. Match the version of an actively-maintained mod's <code>.csproj</code>.</dd>
+    <dt>Harmony</dt><dd>For patches against game internals. Standard pattern for modding Bannerlord.</dd>
+    <dt>MCM</dt><dd>Mod Configuration Menu (community library) for in-game settings. Essential for tuning numbers without recompiling.</dd>
+    <dt>Gauntlet UI</dt><dd>Bannerlord's own UI framework, used for any custom panels (toast composition, seating UI, outcomes screen). Nontrivial; budget time to learn it from existing mods.</dd>
+    <dt>Save data</dt><dd>Custom <code>CampaignBehaviorBase</code> subclasses with <code>SyncData</code> implementations. Persistent feast log, tension scores, memorable-feast tags all stored here.</dd>
+    <dt>Build</dt><dd>Visual Studio or Rider. <code>SubModule.xml</code> manifest. Output DLL into <code>Modules/[YourModName]/bin/Win64_Shipping_Client/</code>.</dd>
+  </dl>
+
+  <h3 id="mvp"><span class="num">§ XIII</span> The Minimum Playable Build</h3>
+
+  <p>Before building the full v1, ship an internal <strong>MVP</strong> — a feast that gathers attendees, lets the player toast, and shows an outcomes screen. Skip Phases 3-6 entirely. This validates the core loop (trigger → invite → travel → scene → outcome) and surfaces the hard problems early. Estimated MVP scope: roughly three to five weeks of solo work.</p>
+
+  <p>Once the MVP runs end-to-end without crashing, expand outward into Phase 3, then Phase 4, and so on. <strong>Resist the temptation to build all phases in parallel</strong> — they share architecture, and building the architecture once for Phase 2 means everything after rides on tested code.</p>
+
+  <h3 id="phases-impl"><span class="num">§ XIV</span> Implementation Phases</h3>
+
+  <p>Listed in build order. Each phase produces a testable artefact. Time estimates are rough solo-developer days, assuming part-time pace; adjust based on your own velocity.</p>
+
+  <div class="step">
+    <span class="step-num">Step 0</span>
+    <h4>Scaffolding</h4>
+    <div class="step-meta">
+      <span>~3–7 days</span>
+      <span>·</span>
+      <span><span class="tag risk-low">low risk</span></span>
+    </div>
+    <p><code>SubModule.xml</code>, project layout, MCM bootstrap, base <code>CampaignBehaviorBase</code> class registered with the campaign, empty <code>SyncData</code> hook, Harmony bootstrap (even if unused initially). Confirm it loads without crashing into a vanilla campaign.</p>
+    <p><strong>Output:</strong> a mod that does nothing but appears in the launcher and does not break saves.</p>
+  </div>
+
+  <div class="step">
+    <span class="step-num">Step 1</span>
+    <h4>Trigger system</h4>
+    <div class="step-meta">
+      <span>~5–10 days</span>
+      <span>·</span>
+      <span><span class="tag risk-med">medium risk</span></span>
+    </div>
+    <p>Listen for the trigger events:</p>
+    <ul>
+      <li>Settlement ownership changes (victory feast candidates)</li>
+      <li>Kingdom leader changes (coronation feasts)</li>
+      <li>Marriage events (wedding feasts)</li>
+      <li>War-state changes (peace celebrations)</li>
+      <li>Hero coming-of-age (heir feasts) — <em>verify the event exists; may need a daily-tick check on hero ages instead</em></li>
+    </ul>
+    <p>Build the per-kingdom scheduler with cooldowns. AI faction picks a host (highest-relation fief-holder to the trigger event). Player-trigger menu in the Clan screen.</p>
+    <p><strong>Risk:</strong> exact event names need verification. Plan a half-day for decompiling <code>CampaignEvents</code> and finding what fires when.</p>
+    <p><strong>Output:</strong> in-game notification "Lord X is hosting a feast at [fief]" appears at appropriate moments.</p>
+  </div>
+
+  <div class="step">
+    <span class="step-num">Step 2</span>
+    <h4>Invitations &amp; RSVPs</h4>
+    <div class="step-meta">
+      <span>~5–7 days</span>
+      <span>·</span>
+      <span><span class="tag risk-low">low–medium risk</span></span>
+    </div>
+    <p>Generate invitation list from kingdom heroes plus diplomatic guests. Per-hero RSVP decision based on relation, distance (settlement positions are exposed), war state, rivals on the list, personality. Notification UI showing accepts/declines as they roll in.</p>
+    <p>Snub bookkeeping: not-invited allies record a relation hit applied immediately or on RSVP day.</p>
+    <p><strong>Output:</strong> player can click a notification and see "Invited: 12. Accepted: 9. Declined: 3."</p>
+  </div>
+
+  <div class="step">
+    <span class="step-num">Step 3</span>
+    <h4>Travel</h4>
+    <div class="step-meta">
+      <span>~4–7 days</span>
+      <span>·</span>
+      <span><span class="tag risk-med">medium–high risk</span></span>
+    </div>
+    <p>Spawn or repurpose existing lord parties so they head to the host fief with an AI override that prevents normal behaviour while travelling-to-feast. Arrival detection (party reaches host settlement). Mark the lord as "at feast" — a state the rest of the system reads.</p>
+    <p><strong>Risk:</strong> overriding lord AI behaviour is fragile and the most common source of mod incompatibility. Use the lightest-touch hook you can find. Existing diplomacy mods may show patterns.</p>
+    <p><strong>Output:</strong> lords visibly converge on the host settlement on the campaign map over the lead-time period.</p>
+  </div>
+
+  <div class="step">
+    <span class="step-num">Step 4</span>
+    <h4>Feast scene &amp; Phase 1 (Mingling)</h4>
+    <div class="step-meta">
+      <span>~10–15 days</span>
+      <span>·</span>
+      <span><span class="tag risk-high">high risk</span></span>
+    </div>
+    <p>The single most complex piece. Custom <code>MissionBehavior</code> that:</p>
+    <ul>
+      <li>Loads the host's lord hall scene</li>
+      <li>Spawns agent-attendees for each arrived guest at appropriate positions</li>
+      <li>Runs a state machine for phase progression</li>
+      <li>Routes player click-on-agent to dialogue</li>
+      <li>Auto-prompts greetings on arrival animations</li>
+    </ul>
+    <p>Phase 1's dialogue uses the existing dialogue system (XML conditions/consequences plus C# helpers). Pleasantries and topical-conversation dialogues authored here.</p>
+    <p><strong>Risk:</strong> agent spawning into an existing scene mid-mission is the highest-risk technical task in the whole mod. Prototype it first, before any other phase work, to confirm feasibility. If it cannot be done cleanly, fall back to a stylised "feast view" UI rather than a populated 3D scene.</p>
+    <p><strong>Output:</strong> player can enter a host's lord hall, see attendees, click them, exchange basic dialogue.</p>
+  </div>
+
+  <div class="step">
+    <span class="step-num">Step 5</span>
+    <h4>Phase 2 (Toasts)</h4>
+    <div class="step-meta">
+      <span>~10–15 days</span>
+      <span>·</span>
+      <span><span class="tag risk-med">medium risk</span></span>
+    </div>
+    <p>Composition UI (custom Gauntlet panel for the two-step picker). Audience reaction calculations (subject × style × occasion × listener preferences × Charm). Renown and relation deltas. <strong>Content task:</strong> 75–90 written toast strings. Schedule this in parallel with engineering.</p>
+    <p><strong>Output:</strong> player can give a toast, see the room react, see deltas applied.</p>
+  </div>
+
+  <div class="step">
+    <span class="step-num">Step 6</span>
+    <h4>Phase 7 (Conclusion) — first cut</h4>
+    <div class="step-meta">
+      <span>~5–7 days</span>
+      <span>·</span>
+      <span><span class="tag risk-low">low–medium risk</span></span>
+    </div>
+    <p>Closing toast (reuses Phase 2 system with new subject list). Outcomes screen (Gauntlet UI). Persistent flag storage (memorable-feast log, "recently hosted" status, etc.). Departure handling (lords leave the settlement).</p>
+    <div class="callout note">
+      <span class="callout-label">MVP Milestone</span>
+      <p>At this point, you have a complete end-to-end loop: trigger fires → invitations sent → guests travel → feast scene runs Phase 1 → Phase 2 toast → Phase 7 outcomes. Phases 3-6 are skipped. <strong>This is the MVP. Playtest aggressively before continuing.</strong> If anything is going to break, it will break here, and you want to find out before building five more phases on top.</p>
+    </div>
+  </div>
+
+  <div class="step">
+    <span class="step-num">Step 7</span>
+    <h4>Phase 3 (Feasting)</h4>
+    <div class="step-meta">
+      <span>~12–18 days</span>
+      <span>·</span>
+      <span><span class="tag risk-med">medium–high risk</span></span>
+    </div>
+    <p>Seating UI (drag-and-drop is heavier than a list-picker; consider list-picker for v1). Extended seated dialogue trees (personal stories, opinions, banter, romance, confession stub). Drinking-game minigame (opposed Vigor + Endurance check, three-to-five rounds, fold or push).</p>
+    <p><strong>Risk:</strong> seating UI is custom and tedious. The dialogue category content is substantial; budget content time alongside engineering.</p>
+  </div>
+
+  <div class="step">
+    <span class="step-num">Step 8</span>
+    <h4>Phase 4 (Tournament)</h4>
+    <div class="step-meta">
+      <span>~5–10 days</span>
+      <span>·</span>
+      <span><span class="tag risk-med">medium risk</span></span>
+    </div>
+    <p>Hook into existing tournament system, populating bracket with feast guests. Archery scoring (custom — five shots, point values, two-round format). Champion's privilege flow.</p>
+    <p><strong>Risk:</strong> depends on how moddable the tournament code is. Worst case: build a feast-specific lightweight tournament that doesn't reuse the vanilla bracket UI.</p>
+  </div>
+
+  <div class="step">
+    <span class="step-num">Step 9</span>
+    <h4>Phase 5 (Dance &amp; Private)</h4>
+    <div class="step-meta">
+      <span>~8–12 days</span>
+      <span>·</span>
+      <span><span class="tag risk-med">medium risk</span></span>
+    </div>
+    <p>Dance abstraction (fade-to-text scene with single illustration; tone picker; relation/romance deltas). Private-conversation slot system (three slots, NPCs who seek you out are free). Romance hooks stubbed for the marriage system to consume later.</p>
+  </div>
+
+  <div class="step">
+    <span class="step-num">Step 10</span>
+    <h4>Phase 6 (Confrontations)</h4>
+    <div class="step-meta">
+      <span>~8–12 days</span>
+      <span>·</span>
+      <span><span class="tag risk-med">medium risk</span></span>
+    </div>
+    <p>Tension scoring (computed across phases, exposed via UI flags). Confrontation type roller. Type A (verbal) and Type B (duel challenge) handlers in full. Type C (brawl) simplified. Type D (revelation) as flavour stub. Duel scheduling — fire as a separate event the next dawn, reusing existing duel mechanics.</p>
+  </div>
+
+  <div class="step">
+    <span class="step-num">Step 11</span>
+    <h4>Polish, integration, AI host behaviour</h4>
+    <div class="step-meta">
+      <span>~10–20 days</span>
+      <span>·</span>
+      <span><span class="tag risk-med">medium risk, ongoing</span></span>
+    </div>
+    <p>AI host configuration (when AI lords decide to host, who they invite, how they configure feasts). Cultural flavour strings (light per-culture variation in toasts, greetings). Memorable-feast callback dialogue injection. Performance testing with thirty-guest royal feasts. Notification suppression layer during feasts (urgent events only). Bug fixing.</p>
+  </div>
+
+  <h3 id="risks"><span class="num">§ XV</span> Risk Register</h3>
+
+  <table>
+    <thead><tr><th>Risk</th><th>Severity</th><th>Mitigation</th></tr></thead>
+    <tbody>
+      <tr><td>Agent spawning into vanilla scenes</td><td>High</td><td>Prototype before any other phase work. Fallback: stylised UI view instead of populated 3D scene.</td></tr>
+      <tr><td>Lord AI override conflicts with other mods</td><td>High</td><td>Lightest-touch hook possible. Document mod conflicts. Test against Diplomacy and other major mods.</td></tr>
+      <tr><td>Tournament system not moddable as hoped</td><td>Medium</td><td>Build a feast-specific lightweight tournament if needed. Cuts polish but ships.</td></tr>
+      <tr><td>Save bloat from feast log</td><td>Medium</td><td>Cap log size; expire routine entries after 12 months; only catastrophes are permanent.</td></tr>
+      <tr><td>Performance with 30+ agents in lord hall</td><td>Medium</td><td>Test early. May need to cap visible agents and abstract the rest.</td></tr>
+      <tr><td>Content writing burden (75–90 toast strings, dialogue trees)</td><td>Medium</td><td>Schedule alongside engineering, not after. Recruit a writer collaborator if possible.</td></tr>
+      <tr><td>Patch breaking the mod</td><td>Medium, ongoing</td><td>Use Harmony judiciously; avoid deep internals where possible. Maintain a CI test save that exercises the full feast loop.</td></tr>
+      <tr><td>Scope creep into marriage/diplomacy</td><td>High</td><td>Hard discipline. Stub the hooks; don't build the systems. v1 ships feasts, nothing else.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ========================= PART VI ========================= -->
+<section class="part" id="part-6">
+  <div class="part-marker">Part the Sixth</div>
+  <h2 class="part-title">Open Questions</h2>
+  <div class="part-divider"></div>
+
+  <p>Decisions deferred from the design discussion. Each must be resolved before its corresponding implementation step.</p>
+
+  <h3><span class="num">§ XVI</span> Architectural</h3>
+
+  <dl>
+    <dt>Notification suppression layer — what counts as urgent during a feast?</dt>
+    <dd>The principle is "only war-state changes, attacks on player fiefs, and direct combat engagements interrupt." But the exact event filter list needs definition before Step 11. Routine bandit raids on distant villages, ordinary caravan losses, market fluctuations: silenced. Anything that fundamentally changes the player's strategic situation: surfaced.</dd>
+
+    <dt>NPC preference database — authored or generated?</dt>
+    <dd>Two approaches: (a) hand-author preferences for all named NPCs (~150-300 heroes; serious content task but precise). (b) Generate from existing personality traits (Honor → Solemn affinity, Mercy → Humble, Calculating → Witty, Valour → Boastful; fast but less expressive). Recommended: <strong>hybrid</strong> — generate baselines from traits, then hand-edit notable rulers and major characters for distinct profiles. v1 can ship generated-only; v2 adds hand-authored variations.</dd>
+
+    <dt>Standing-system formula — exact tier thresholds?</dt>
+    <dd>Discussed conceptually but never numerically pinned. A first-cut proposal: Commoner = no clan; Aspirant = tier 1 OR tier 0 with 100+ renown; Established = tier 2-3; Magnate = tier 4+. Cultural-match modifier: ±1 effective tier within a culture. Bloodline modifier: chargen-set, +1 effective tier even at low real tier (an exiled noble's son starts as Aspirant despite tier 0). Patronage: +1 effective tier in the patron's sphere of influence for as long as patronage holds.</dd>
+
+    <dt>Memorable-feast log capacity?</dt>
+    <dd>Saves can bloat. Proposed cap: 50 entries per save, expiring routine entries first (oldest non-catastrophe). Catastrophes never expire automatically. Total log size at full capacity remains under a few KB.</dd>
+
+    <dt>AI host configuration — how detailed?</dt>
+    <dd>The AI must decide: when to host (already covered by trigger system), guest list (default: own clan + clan tier ≥ 2 in same kingdom, ± personality-driven biases for/against rivals), scale (driven by trigger and host wealth), tournament inclusion (driven by host personality — martial lords yes, scholarly lords no). v1 should ship a deterministic-by-personality AI configuration; v2 can layer in faction-political considerations.</dd>
+  </dl>
+
+  <h3><span class="num">§ XVII</span> Design</h3>
+
+  <dl>
+    <dt>How does player-as-attendee experience compare to player-as-host?</dt>
+    <dd>The phases are identical in structure but the player's options differ in each. Phase 1: attendees greet host, hosts greet arrivals. Phase 2: attendees may be called to give a toast (high-tier) or rise voluntarily (medium-tier); hosts give the opening and closing. Phase 3: hosts arrange seating, attendees are seated. Phase 6: hosts have authority options (silence, eject, take outside), attendees have intervention options. Phase 7: hosts give closing toast, attendees do not. <em>This needs a side-by-side spec written before Step 4.</em></dd>
+
+    <dt>Cross-cultural courtship modifiers — how strong?</dt>
+    <dd>Discussed but not weighted. Proposal: same culture = baseline; adjacent culture (e.g., Imperial-Vlandian) = relation gains/losses ×0.9; distant culture (Imperial-Khuzait) = ×0.75. Cultural alignment matters but does not block the system.</dd>
+
+    <dt>What happens if the player is a clan head with no spouse, hosting? Is there a hostess role?</dt>
+    <dd>In Warband, spouses played hostess. In Bannerlord, single players or widowed players exist. v1 proposal: solo hosts simply do everything themselves; family members (siblings, adult children) take on supporting roles. v2 can deepen the spouse role for partnered hosts.</dd>
+  </dl>
+</section>
+
+<!-- ========================= PART VII ========================= -->
+<section class="part" id="part-7">
+  <div class="part-marker">Part the Seventh</div>
+  <h2 class="part-title">Out of Scope &amp; Future Work</h2>
+  <div class="part-divider"></div>
+
+  <p>The feast system is designed to be a foundation that other systems hook into, not a monolith. Several systems are out of scope for v1 but have explicit handoff points already designed:</p>
+
+  <h3><span class="num">§ XVIII</span> Marriage System</h3>
+  <p>Hooks at <strong>Phase 5 — romance climax window</strong>. The feast handles the consummation of courtship; the marriage system, when built, handles the multi-stage courtship leading up to it (introduction, discovery of preferences, poetry recitation, gift-giving, guardian's blessing, dowry negotiation) and the wedding ceremony itself (which is a configured instance of the feast system).</p>
+  <p><strong>Scope of marriage system:</strong> a phased questline running on the campaign map, parallel to other activities, gated by the standing system. Estimated 2-3 months solo work after feasts ship.</p>
+
+  <h3><span class="num">§ XIX</span> Conspiracy &amp; Secrets System</h3>
+  <p>Hooks at <strong>Phase 3 — confessions and secrets</strong> (private revelations of treason, debt, hidden affairs) and <strong>Phase 6 — Type D public revelations</strong>. The feast surfaces and reveals; the conspiracy system, when built, persists secrets across the campaign and creates the dramatic stakes that make Type D revelations meaningful.</p>
+
+  <h3><span class="num">§ XX</span> Diplomacy Overhaul</h3>
+  <p>Hooks at <strong>Phase 1 — strategic conversation</strong> and <strong>Phase 5 — private conversation</strong>. The feast provides the venue for diplomatic exchanges; the diplomacy system, when overhauled, defines what those exchanges can produce (alliances, trade pacts, non-aggression treaties, coalition-building against snowballers). Existing community mods (Diplomacy) cover much of this ground; integration rather than replacement is the path.</p>
+
+  <h3><span class="num">§ XXI</span> Child-Rearing UX</h3>
+  <p>Not directly hooked into feasts, but a downstream consequence of the marriage system. The vanilla "guide your child every two years" system collapses under family-focused playthroughs (hundreds of perk-allocation popups by the fourth generation). When the marriage system is built, the child-rearing UX must be rebuilt alongside it — perhaps with auto-allocate options scoped to children specifically, or a one-time per-child guidance with milestone events.</p>
+
+  <h3><span class="num">§ XXII</span> Other Common Bannerlord Complaints — Explicitly Out of Scope</h3>
+  <p>The following are widely-complained-about Bannerlord issues that this mod does <em>not</em> attempt to solve. Listed here so scope discipline is explicit:</p>
+  <ul>
+    <li><strong>Siege AI</strong> — separate, large mod scope. Existing fixes (Fix Siege AI on Nexus) cover this ground.</li>
+    <li><strong>Battle AI pathfinding</strong> — out of scope.</li>
+    <li><strong>Performance and crashes</strong> — out of scope.</li>
+    <li><strong>Snowballing</strong> — touched indirectly (relation-stable kingdoms defect less, which slows the runaway-faction problem) but not directly addressed.</li>
+    <li><strong>Tournament prizes / lord participation</strong> — partially addressed within feast tournaments, but vanilla tournaments untouched.</li>
+    <li><strong>Co-op multiplayer</strong> — out of scope.</li>
+  </ul>
+</section>
+
+<!-- ========================= APPENDIX ========================= -->
+<section class="part" id="appendix">
+  <div class="part-marker">Appendix</div>
+  <h2 class="part-title">Decisions Log</h2>
+  <div class="part-divider"></div>
+
+  <p>A record of the principal design decisions made during specification, for future reference when scope pressure tempts revisitation. Each was a deliberate choice with a deliberate rationale.</p>
+
+  <table>
+    <thead><tr><th>Decision</th><th>Rationale</th></tr></thead>
+    <tbody>
+      <tr><td>Only fief-holders may host</td><td>Makes feasts aspirational; gives lower-tier players a reason to climb before they can throw their own; keeps prestige meaningful.</td></tr>
+      <tr><td>1–2 feasts per kingdom per year</td><td>Each feast has weight; calendar does not become spam; matches Warband pacing where feasts felt like events.</td></tr>
+      <tr><td>All six activities included (toasts, drinking, tournament, dance, dialogue, confrontations)</td><td>Maximalist on activity coverage. Restoring depth, not minimum-viable. Scope-tiered v1/v2/v3 prevents this from killing the project.</td></tr>
+      <tr><td>Vanilla lord halls reused</td><td>Authoring six per-culture custom feast scenes is unjustified. Scaling guest cap by fief size makes capital cities meaningfully better venues.</td></tr>
+      <tr><td>World keeps moving during feasts</td><td>Realistic, creates real tension, makes peacetime feel earned. Notification suppression layer prevents trivial interruptions.</td></tr>
+      <tr><td>Same Phase 1-7 across cultures</td><td>Saves enormous work. Cultural flavour delivered cheaply via dialogue strings.</td></tr>
+      <tr><td>Toast composition: subject × style, no preview</td><td>The Warband-poetry mechanic restored. Information is partial; reading the room is the skill.</td></tr>
+      <tr><td>Text-only toasts in v1</td><td>Voice acting is a content blocker. Ship the system; voice later if at all.</td></tr>
+      <tr><td>Failure tolerance: harsh on courtship-relevant listeners, forgiving on the room</td><td>Stakes preserved where they matter, save-scum prevented elsewhere. Asymmetric by design.</td></tr>
+      <tr><td>Tournament: melee + archery in v1</td><td>Archery is cheap to implement and broadens character viability (non-combat builds can compete). Joust deferred to v2.</td></tr>
+      <tr><td>Dance: stylised abstraction, not animated</td><td>Animation work is enormous. Fade-to-text scene with tone-picker delivers the social mechanics without the asset burden.</td></tr>
+      <tr><td>Confrontation visibility: hybrid (flags visible, probabilities hidden)</td><td>Player agency preserved; surprise preserved. Seating decisions in Phase 3 become meaningful because they knowingly stack risk.</td></tr>
+      <tr><td>Closing toast acts as ±20% multiplier on outcomes</td><td>Phase 7 becomes meaningful agency rather than passive resolution. The last impression carries.</td></tr>
+      <tr><td>Marriage system deferred</td><td>Feast is foundation; wedding is a configured instance of the foundation. Scope discipline.</td></tr>
+      <tr><td>Standing system: composite, gated by venue/context not gender</td><td>Solves the "lady commands an army" problem. Same rules apply to male and female targets; access is about decorum and circumstance, not biology.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- COLOPHON -->
+<footer class="colophon">
+  <div class="ornament">❦</div>
+  <p>Compiled in collaboration with Claude.<br>
+  Iterate, refine, and revise as implementation reveals issues.<br>
+  The design is a starting point, not a contract.</p>
+</footer>
+
+</div>
+</body>
+</html>

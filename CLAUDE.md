@@ -119,7 +119,7 @@ A task is *not* done just because the code looks right.
  
 ## Current project state
  
-**Status:** Hello-world verified end-to-end on game version 1.3.15. Toolchain is real; foundation set; no feature work begun.
+**Status:** Hello-world verified, throwaway exploratory mod working, NPC-agents-in-lord-hall spike **passed**. Phase 1 design viable. Ready for Step 0 of the implementation roadmap.
  
 **Toolchain:** Configured.
 
@@ -131,13 +131,13 @@ A task is *not* done just because the code looks right.
  
 **Project scaffolding:** Cloned from the haggen module template, migrated to NuGet refs (`Bannerlord.ReferenceAssemblies.*` plus `Lib.Harmony`/ButterLib/MCM as compile-only), and renamed `ExampleModule` → `FeastsOfCalradia` across csproj, assembly name, root namespace, .sln, and the SubModule entry-point class.
  
-**Hello-world:** Verified — `FeastsOfCalradiaSubModule` registers an `InitialStateOption` that displays "Hello from FeastsOfCalradia!" in the main menu. Confirmed visible in-game.
+**Hello-world:** Verified — `FeastsOfCalradiaSubModule` registers an `InitialStateOption` that displays "Hello from FeastsOfCalradia!" in the main menu.
  
-**Next milestone:** A throwaway exploratory mod (suggested: print all heroes in the player's clan when a key is pressed) to get comfortable with `CampaignBehaviorBase`, save data, and Harmony patching.
+**Throwaway exploratory mod:** Verified — `ClanHeroesProbeBehavior` (a `CampaignBehaviorBase` subclass) registers a `[CommandLineArgumentFunction]` console command `campaign.list_clan_heroes` that prints clan members and persists an invocation counter via `IDataStore.SyncData`. Save → load → command persists count. Demonstrates the `CampaignBehaviorBase` + `SyncData` + console command surface. Throwaway — slated for deletion when Phase 1 architecture lands.
  
-**After throwaway:** The technical spike — confirm whether NPC agents can be spawned into a vanilla lord hall mission and behave (stand, walk, animate). This is the riskiest assumption in the design and must be validated before architecture work begins. Two-week timebox; if it doesn't work cleanly, the design's Phase 1 must be rebuilt around a stylized UI rather than a populated 3D scene.
+**NPC spike:** Verified — `LordHallBotProbeBehavior` proves the canonical guest-invitation mechanism. On settlement entry, picks a target hero (explicit via `campaign.set_lord_hall_bot <name>` or kingdom-mate fallback). For nobles: uses `EnterSettlementAction.ApplyForCharacterOnly` (partyless) or `ApplyForParty` (party-leading) — the canonical "lord visits another lord's fief" pattern. Vanilla's `HeroAgentSpawnCampaignBehavior` then routes them to the lord hall via `HeroAgentLocationModel`, giving us both keep-menu visibility and in-scene presence. On settlement exit, `LeaveSettlementAction` releases them cleanly. Throwaway — slated for deletion when Phase 1 architecture lands.
  
-**Only after the spike succeeds:** Step 0 of the implementation roadmap (real project scaffolding for the feast mod). Phases are tracked in `feast_system_design.html` Part V. Do not jump ahead.
+**Next milestone:** Step 0 of the implementation roadmap. Phases are tracked in `feast_system_design.html` Part V. Do not jump ahead.
  
 ## Known TaleWorlds API gotchas (1.3.15)
  
@@ -145,6 +145,10 @@ Things this project has hit and fixed; saved here so future sessions don't re-de
  
 - **`InformationMessage` and `InformationManager` live in `TaleWorlds.Library`**, not `TaleWorlds.Core`. The `TaleWorlds.Library.dll` is shipped via the `Bannerlord.ReferenceAssemblies.Native` NuGet package; just add `using TaleWorlds.Library;`.
 - **`InitialStateOption`'s 5th constructor argument is `Func<(bool, TextObject)>`** — returns `(isDisabled, disabledReasonTooltip)`. For "always enabled, no tooltip" pass `() => (false, new TextObject("", null))`. Old templates pass `bool` for this argument and fail to compile against current ref assemblies.
+- **`Hero.MainHero.CharacterObject` cannot be used as a `LocationCharacter` template** — when the lord-hall mission spawns LocationCharacters as agents, ones whose CharacterObject is the player are silently skipped (the player is already represented by their own MainAgent). Visible in the LocationCharacter list, invisible in the rendered scene. Use any non-player hero instead.
+- **Adding a `LocationCharacter` to `lordshall` for a notable doesn't stick** — vanilla's `HeroAgentSpawnCampaignBehavior` queries `HeroAgentLocationModel.GetLocationForHero` and `ChangeLocation`s the hero from your placement to their canonical location (notables → town center, governors → throne, nobles → lord hall). To get someone in lord hall via the integrated path, they must be a noble (`Hero.IsLord`).
+- **The canonical "make a hero present at a settlement" pattern is `EnterSettlementAction`**, paired with `LeaveSettlementAction` for cleanup. `ApplyForCharacterOnly(hero, settlement)` for partyless heroes, `ApplyForParty(party, settlement)` for party-leading heroes. The latter pulls the entire party into the settlement (matches vanilla "lord visits another lord's fief" flow). Direct property assignment (`hero.StayingInSettlement = settlement`) is a subset and bypasses related state cleanup.
+- **Console commands for mods are registered by attribute**, not by explicit registration — `[CommandLineFunctionality.CommandLineArgumentFunction("verb", "category")]` on a `public static string Method(List<string> strings)`. The engine scans loaded assemblies. Invoked in dev console as `category.verb`. Cheat mode must be enabled via `cheat_mode = 1` in `engine_config.txt` for the dev console to be reachable.
  
 ## Things the human will tell you, that you should remember
  
