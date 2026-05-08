@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <Import Project="env.xml" />
+
+    <PropertyGroup>
+        <TargetFramework>net472</TargetFramework>
+        <PlatformTarget>x64</PlatformTarget>
+        <AssemblyName>FeastsOfCalradia</AssemblyName>
+        <RootNamespace>FeastsOfCalradia</RootNamespace>
+        <AssemblyVersion>0.1.0</AssemblyVersion>
+        <FileVersion>0.1.0</FileVersion>
+        <Configurations>Debug;Release</Configurations>
+
+        <!-- Bannerlord refuses to load mods with a .deps.json file next to the DLL -->
+        <GenerateDependencyFile>false</GenerateDependencyFile>
+        <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
+
+        <!-- Write the built DLL straight into the deployed module's bin folder -->
+        <OutputPath>$(GameFolder)\Modules\$(AssemblyName)\bin\Win64_Shipping_Client\</OutputPath>
+        <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <!-- TaleWorlds API surface, metadata-only. PrivateAssets=all keeps these out of the output. -->
+        <PackageReference Include="Bannerlord.ReferenceAssemblies.Native" Version="1.3.15.110062" PrivateAssets="all" />
+        <PackageReference Include="Bannerlord.ReferenceAssemblies.Core" Version="1.3.15.110062" PrivateAssets="all" />
+        <PackageReference Include="Bannerlord.ReferenceAssemblies.SandBox" Version="1.3.15.110062" PrivateAssets="all" />
+        <PackageReference Include="Bannerlord.ReferenceAssemblies.StoryMode" Version="1.3.15.110062" PrivateAssets="all" />
+
+        <!-- Framework mods. IncludeAssets=compile means we link against them but don't bundle them; players install the framework mods separately. -->
+        <PackageReference Include="Lib.Harmony" Version="2.4.2" IncludeAssets="compile" />
+        <PackageReference Include="Bannerlord.ButterLib" Version="2.10.4" IncludeAssets="compile" />
+        <PackageReference Include="Bannerlord.MCM" Version="5.11.4" IncludeAssets="compile" />
+    </ItemGroup>
+
+    <Target Name="DeployModuleAssets" AfterTargets="PostBuildEvent">
+        <Exec Command="powershell.exe -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\PostBuild.ps1&quot; -Name &quot;$(AssemblyName)&quot; -Version &quot;$(FileVersion)&quot; -GameFolder &quot;$(GameFolder)&quot; -Config $(Configuration)" />
+    </Target>
+</Project>

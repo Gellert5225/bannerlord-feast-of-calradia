@@ -1,45 +1,40 @@
 [CmdletBinding()]
-
 param (
     [Parameter(Mandatory)][string]$Name,
-    [Parameter(Mandatory)][string]$Dll,
-    [Parameter(Mandatory)][string]$Game,
+    [Parameter(Mandatory)][string]$Version,
+    [Parameter(Mandatory)][string]$GameFolder,
     [string]$Config
 )
 
-# Set dist folder.
-$dist = ".\dist"
-$Version = (Get-ChildItem "$Dll").VersionInfo.FileVersion
+# OutputPath in the .csproj already wrote the DLL into:
+#   $GameFolder\Modules\$Name\bin\Win64_Shipping_Client\$Name.dll
+# This script copies the rest of the module assets (SubModule.xml, ModuleData/)
+# into that same module folder, doing macro substitution on SubModule.xml.
 
-# Clean dist folder.
-Remove-Item "$dist\$Name" -Recurse
+$ErrorActionPreference = "Stop"
 
-# Create final module folder in the `dist` directory.
-Copy-Item ".\Module" -Destination "$dist\$Name" -Recurse -Exclude SubModule.xml, .gitkeep
+$repoRoot   = $PSScriptRoot
+$moduleRoot = Join-Path $GameFolder "Modules\$Name"
 
-# Copy the built assembly in place.
-Copy-Item "$Dll" -Destination "$dist\$Name\bin\Win64_Shipping_Client"
+# Ensure the module folder exists (OutputPath creates it on build, but be defensive)
+New-Item -ItemType Directory -Path $moduleRoot -Force | Out-Null
 
-# Evaluate macros and copy SubModule.xml.
-(Get-Content ".\Module\SubModule.xml" -Raw) `
-    -Replace '\$\(Version\)', "$Version" `
-    -Replace '\$\(Name\)', "$Name" | Set-Content -Path "$dist\$Name\SubModule.xml"
+# Substitute $(Name) and $(Version) into SubModule.xml and write to the module folder.
+$subModuleSrc  = Join-Path $repoRoot "SubModule.xml"
+$subModuleDest = Join-Path $moduleRoot "SubModule.xml"
+(Get-Content $subModuleSrc -Raw) `
+    -replace '\$\(Name\)',    $Name `
+    -replace '\$\(Version\)', $Version `
+    | Set-Content -Path $subModuleDest -Encoding UTF8
 
-# Install the module into the game directory.
-Remove-Item "$Game\Modules\$Name" -Recurse
-Copy-Item "$dist\$Name" -Destination "$Game\Modules" -Recurse
-
-# Run the game with our module if we're debugging.
-if ($Config -eq "Debug") {
-    Start-Process -FilePath "$Game\bin\Win64_Shipping_Client\Bannerlord.exe" -WorkingDirectory "$Game\bin\Win64_Shipping_Client" -ArgumentList "/singleplayer _MODULES_*Native*SandBoxCore*CustomBattle*SandBox*StoryMode*$Name*_MODULES_"
-}
-
-# Archive the final folder if we're releasing.
-if ($Config -eq "Release") {
-    # Remove the archive if it already exists.
-    if (Test-Path "$dist\$Name-$Version.zip" -PathType Leaf) {
-        Remove-Item "$dist\$Name-$Version.zip"
+# Mirror ModuleData/ if the source folder exists. Robocopy /MIR keeps the destination
+# in sync (deletes files removed from source). Exit codes 0-7 are non-fatal for robocopy.
+$moduleDataSrc  = Join-Path $repoRoot "ModuleData"
+$moduleDataDest = Join-Path $moduleRoot "ModuleData"
+if (Test-Path $moduleDataSrc) {
+    robocopy $moduleDataSrc $moduleDataDest /MIR /NFL /NDL /NJH /NJS /NP | Out-Null
+    if ($LASTEXITCODE -ge 8) {
+        throw "robocopy failed with exit code $LASTEXITCODE"
     }
-    
-    Compress-Archive "$dist\$Name" "$dist\$Name-$Version.zip"
+    $global:LASTEXITCODE = 0
 }

@@ -1,0 +1,11 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Attach to Bannerlord",
+            "type": "clr",
+            "request": "attach",
+            "processName": "Bannerlord.exe"
+        }
+    ]
+}

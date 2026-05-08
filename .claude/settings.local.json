@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:www.nuget.org)",
+      "WebSearch",
+      "Bash(git -C \"i:/bannerlord-feast-of-calradia\" ls-files Module/)",
+      "Bash(git -C \"i:/bannerlord-feast-of-calradia\" status)"
+    ]
+  }
+}
