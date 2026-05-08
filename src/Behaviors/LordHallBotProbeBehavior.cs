@@ -1,6 +1,7 @@
 using System.Text;
 using SandBox;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.AgentOrigins;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.Party;
@@ -21,6 +22,14 @@ namespace FeastsOfCalradia.Behaviors
         // Tracks the LocationCharacter we last added so we can detect whether the engine cleared it
         // between missions (the suspected cause of the bot not appearing in the rendered scene).
         private LocationCharacter _currentBot;
+
+        // The hero we last used as the bot template AND moved into the settlement. Tracked so we can
+        // (a) avoid redundant re-applies within the same visit, (b) cleanly release them on player exit.
+        // Not synced — see VERIFY note in OnSettlementLeft for save/load edge case.
+        private Hero _currentGuestHero;
+        // Set if the guest was brought in via ApplyForParty (party-leading lord). Drives which
+        // LeaveSettlementAction overload to use during cleanup.
+        private MobileParty _currentGuestParty;
 
         public bool Enabled
         {
@@ -77,10 +86,12 @@ namespace FeastsOfCalradia.Behaviors
 
         private void OnSettlementLeft(MobileParty party, Settlement settlement)
         {
-            if (party == MobileParty.MainParty)
+            if (party != MobileParty.MainParty)
             {
-                _currentBot = null;
+                return;
             }
+            ReleaseGuest(settlement);
+            _currentBot = null;
         }
 
         public string ForceSpawnInCurrentSettlement()
@@ -109,9 +120,7 @@ namespace FeastsOfCalradia.Behaviors
                 return Diagnostic("[" + source + "] skip: no 'lordshall' location.");
             }
 
-            // Dedup: if our previously-added bot is still in lordshall, don't add another. If it's been
-            // cleared by the engine between missions, _currentBot is stale and we re-add.
-            bool botAlreadyPresent = false;
+            // Pre-state diagnostic: list current lordshall characters.
             int existingCount = 0;
             var existing = new StringBuilder();
             foreach (LocationCharacter c in lordHall.GetCharacterList())
@@ -122,47 +131,120 @@ namespace FeastsOfCalradia.Behaviors
                     existing.Append(", ");
                 }
                 existing.Append(c.Character?.Name?.ToString() ?? "?");
-                if (c == _currentBot)
-                {
-                    botAlreadyPresent = true;
-                }
             }
+            Diagnostic("[" + source + "] lordshall has " + existingCount + " character(s): " + (existingCount == 0 ? "<empty>" : existing.ToString()));
 
-            string preState = "[" + source + "] lordshall has " + existingCount + " character(s): " + (existingCount == 0 ? "<empty>" : existing.ToString())
-                              + " | our bot already present: " + botAlreadyPresent;
-            Diagnostic(preState);
-
-            if (botAlreadyPresent)
-            {
-                return preState;
-            }
-
-            LocationCharacter probeBot = CreateProbeBot();
-            if (probeBot == null)
-            {
-                return Diagnostic("[" + source + "] skip: CreateProbeBot returned null.");
-            }
-            lordHall.AddCharacter(probeBot);
-            _currentBot = probeBot;
-            return Diagnostic("[" + source + "] added probe bot. lordshall now has " + (existingCount + 1) + " character(s).");
-        }
-
-        private LocationCharacter CreateProbeBot()
-        {
             Hero template = SelectTemplateHero();
             if (template?.CharacterObject == null)
             {
-                Diagnostic("CreateProbeBot: no usable template hero available.");
-                return null;
+                return Diagnostic("[" + source + "] skip: no usable template hero.");
             }
-            Diagnostic("CreateProbeBot: selected '" + template.Name + "' (" + template.StringId + "), faction=" + (template.MapFaction?.Name?.ToString() ?? "?") + ", clan=" + (template.Clan?.Name?.ToString() ?? "?"));
+            Diagnostic("Selected '" + template.Name + "' (" + template.StringId + "), faction=" + (template.MapFaction?.Name?.ToString() ?? "?") + ", clan=" + (template.Clan?.Name?.ToString() ?? "?") + ", isLord=" + template.IsLord + ", hasParty=" + (template.PartyBelongedTo != null));
 
+            // Two paths depending on whether the chosen hero is a noble.
+            //  Path A (full integration): lord/lady, no governor role. If partyless, ApplyForCharacterOnly
+            //          marks them as staying in settlement. If they have a party, ApplyForParty pulls
+            //          their whole party (with troops) into the settlement — same mechanism vanilla uses
+            //          when an NPC lord visits another lord's fief. Either way, their party (if any)
+            //          parks at your settlement and they appear in keep menu + lord hall scene.
+            //  Path B (manual lord-hall placement): non-noble (e.g. fallback notable from tier 4). Skip
+            //          ApplyForXXX entirely — vanilla would route a notable to town center, not lord hall.
+            //          Just add a LocationCharacter directly to lordshall. Lord-hall scene only.
+            bool canIntegrate = template.IsLord && template.GovernorOf == null;
+
+            if (canIntegrate)
+            {
+                if (_currentGuestHero == template)
+                {
+                    return Diagnostic("[" + source + "] full-integration guest '" + template.Name + "' already applied this visit.");
+                }
+                ReleaseGuest(settlement);
+
+                if (template.PartyBelongedTo != null)
+                {
+                    // Party-leading noble: bring their party into the settlement (vanilla "lord visits" pattern).
+                    EnterSettlementAction.ApplyForParty(template.PartyBelongedTo, settlement);
+                    _currentGuestParty = template.PartyBelongedTo;
+                    _currentGuestHero = template;
+                    return Diagnostic("[" + source + "] full integration via ApplyForParty: '" + template.Name + "' arrived with their party. Should appear in keep menu + lord hall.");
+                }
+                else
+                {
+                    EnterSettlementAction.ApplyForCharacterOnly(template, settlement);
+                    _currentGuestHero = template;
+                    return Diagnostic("[" + source + "] full integration via ApplyForCharacterOnly: '" + template.Name + "' is now staying in settlement. Should appear in keep menu + lord hall.");
+                }
+            }
+
+            // Path B — manual lord-hall placement.
+            bool botAlreadyPresent = false;
+            foreach (LocationCharacter c in lordHall.GetCharacterList())
+            {
+                if (c == _currentBot)
+                {
+                    botAlreadyPresent = true;
+                    break;
+                }
+            }
+            if (botAlreadyPresent)
+            {
+                return Diagnostic("[" + source + "] manual bot for '" + template.Name + "' already in lordshall.");
+            }
+
+            LocationCharacter bot = BuildLocationCharacterFor(template);
+            if (bot == null)
+            {
+                return Diagnostic("[" + source + "] skip: BuildLocationCharacterFor returned null.");
+            }
+            lordHall.AddCharacter(bot);
+            _currentBot = bot;
+            return Diagnostic("[" + source + "] manual placement of '" + template.Name + "' in lordshall (party-leading or non-noble; lord-hall scene only, not keep menu).");
+        }
+
+        private void ReleaseGuest(Settlement here)
+        {
+            // Party-path release: the guest came in via ApplyForParty (party leader). Send their party
+            // back out via ApplyForParty's counterpart.
+            if (_currentGuestParty != null)
+            {
+                if (_currentGuestParty.CurrentSettlement == here)
+                {
+                    Diagnostic("Releasing guest party '" + (_currentGuestParty.Name?.ToString() ?? "?") + "' from " + here.Name + ".");
+                    LeaveSettlementAction.ApplyForParty(_currentGuestParty);
+                }
+                _currentGuestParty = null;
+                _currentGuestHero = null;
+                return;
+            }
+            // Character-path release: the guest came in via ApplyForCharacterOnly.
+            if (_currentGuestHero == null)
+            {
+                return;
+            }
+            if (_currentGuestHero.StayingInSettlement == here)
+            {
+                Diagnostic("Releasing guest '" + _currentGuestHero.Name + "' from " + here.Name + ".");
+                if (_currentGuestHero.CurrentSettlement != null)
+                {
+                    LeaveSettlementAction.ApplyForCharacterOnly(_currentGuestHero);
+                }
+                else
+                {
+                    _currentGuestHero.StayingInSettlement = null;
+                }
+            }
+            _currentGuestHero = null;
+        }
+
+        // Builds a LocationCharacter for a specific hero using the bodyguard pattern (null spawnTag,
+        // fixedLocation=false). Used by the manual placement path when the hero can't go through the
+        // EnterSettlementAction integration (party leaders, governors, notables in fallback).
+        private static LocationCharacter BuildLocationCharacterFor(Hero template)
+        {
             AgentData agentData = new AgentData(new SimpleAgentOrigin(template.CharacterObject, -1, null, default))
                 .Monster(FaceGen.GetBaseMonsterFromRace(template.CharacterObject.Race))
                 .NoHorses(true);
 
-            // Bodyguard pattern: null spawnTag + fixedLocation=false lets the engine pick any valid spawn
-            // point in the scene rather than requiring a specific sp_notable-tagged position.
             return new LocationCharacter(
                 agentData,
                 new LocationCharacter.AddBehaviorsDelegate(SandBoxManager.Instance.AgentBehaviorManager.AddFixedCharacterBehaviors),
@@ -177,7 +259,9 @@ namespace FeastsOfCalradia.Behaviors
         {
             Settlement here = Settlement.CurrentSettlement;
 
-            // 1. Explicit target set via console command takes priority.
+            // 1. Explicit target set via console command takes priority. Honored regardless of category
+            // (noble vs notable, partyless vs party-leading) — caller decides what to do based on the
+            // returned hero's properties.
             if (!string.IsNullOrEmpty(_targetHeroStringId))
             {
                 foreach (Hero h in Hero.AllAliveHeroes)
@@ -190,25 +274,43 @@ namespace FeastsOfCalradia.Behaviors
                 // Target was set but the hero is no longer alive / findable. Fall through to defaults.
             }
 
-            // 2. Default: a "stranger" — non-player, not in player's clan (skips spouse/siblings already
-            // in the hall), not already at this settlement, ideally same MapFaction.
             IFaction myFaction = Hero.MainHero?.MapFaction;
-            if (myFaction != null)
+
+            // 2. Best: partyless noble in player's faction. ApplyForCharacterOnly works on them and
+            // vanilla's HeroAgentLocationModel will route them to lord hall, giving us both keep menu
+            // visibility and in-scene presence.
+            foreach (Hero h in Hero.AllAliveHeroes)
             {
-                foreach (Hero h in Hero.AllAliveHeroes)
+                if (!IsValidStranger(h, here))
                 {
-                    if (!IsValidStranger(h, here))
-                    {
-                        continue;
-                    }
-                    if (h.MapFaction == myFaction)
-                    {
-                        return h;
-                    }
+                    continue;
+                }
+                if (myFaction != null && h.MapFaction != myFaction)
+                {
+                    continue;
+                }
+                if (h.IsLord && h.PartyBelongedTo == null && h.GovernorOf == null)
+                {
+                    return h;
                 }
             }
 
-            // 3. Last resort: any non-player non-clan stranger not at this settlement.
+            // 3. Next: any partyless noble (cross-faction). Same routing benefits as tier 2.
+            foreach (Hero h in Hero.AllAliveHeroes)
+            {
+                if (!IsValidStranger(h, here))
+                {
+                    continue;
+                }
+                if (h.IsLord && h.PartyBelongedTo == null && h.GovernorOf == null)
+                {
+                    return h;
+                }
+            }
+
+            // 4. Fallback: any non-clan stranger (including notables). Manual lord-hall placement only —
+            // they won't appear in the keep menu, and if vanilla decides their canonical location isn't
+            // lord hall they may be moved out by RefreshLocationOfHeroForSettlement. Best-effort.
             foreach (Hero h in Hero.AllAliveHeroes)
             {
                 if (IsValidStranger(h, here))
