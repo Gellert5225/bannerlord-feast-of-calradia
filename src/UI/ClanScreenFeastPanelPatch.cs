@@ -52,7 +52,7 @@ namespace FeastsOfCalradia.UI
             return
                 "<Widget Id=\"FeastLeftColumn\" " +
                 "        WidthSizePolicy=\"Fixed\" HeightSizePolicy=\"StretchToParent\" " +
-                "        SuggestedWidth=\"180\" " +
+                "        SuggestedWidth=\"240\" " +
                 "        HorizontalAlignment=\"Left\" VerticalAlignment=\"Top\" " +
                 "        MarginLeft=\"10\" MarginTop=\"10\">" +
                 "  <Children>" +
@@ -95,10 +95,13 @@ namespace FeastsOfCalradia.UI
 
         private static string CenterColumnXml()
         {
+            // No outer Popup.Frame — each stage panel provides its own framing (Frame1Brush) where
+            // appropriate, mirroring vanilla ClanFiefs/ClanMembers which don't add an extra outer
+            // frame around the active tab's content.
             return
                 "<Widget Id=\"FeastCenterColumn\" " +
                 "        WidthSizePolicy=\"Fixed\" HeightSizePolicy=\"StretchToParent\" " +
-                "        SuggestedWidth=\"460\" " +
+                "        SuggestedWidth=\"720\" " +
                 "        HorizontalAlignment=\"Center\" VerticalAlignment=\"Top\" " +
                 "        MarginTop=\"10\">" +
                 "  <Children>" +
@@ -160,7 +163,13 @@ namespace FeastsOfCalradia.UI
                 "</ButtonWidget>";
         }
 
-        // Phase D content for the Guests stage: header text + scrollable list of kingdom lords.
+        // Phase D content for the Guests stage. Replicates the canonical ClanFiefs.xml left-panel
+        // pattern: a Frame1Brush BrushListPanel containing a sort-button header row (with the
+        // decorative scroll_header sprite at right) and a horizontal ListPanel of
+        // {ScrollablePanel, Standard.VerticalScrollbar}.
+        //
+        // Column widths sum to 640 (220+160+160+100). The ScrollablePanel uses CoverChildren+MinWidth
+        // so the frame self-sizes to content, just like vanilla.
         private static string GuestsStagePanelXml()
         {
             return
@@ -168,42 +177,187 @@ namespace FeastsOfCalradia.UI
                 "        WidthSizePolicy=\"StretchToParent\" HeightSizePolicy=\"StretchToParent\" " +
                 "        IsVisible=\"@IsGuestsStageSelected\">" +
                 "  <Children>" +
-                "    <ListPanel WidthSizePolicy=\"StretchToParent\" HeightSizePolicy=\"CoverChildren\" " +
-                "               VerticalAlignment=\"Top\" " +
+                // Outer vertical stack: body text on top, frame fills remaining height below.
+                "    <ListPanel WidthSizePolicy=\"StretchToParent\" HeightSizePolicy=\"StretchToParent\" " +
                 "               StackLayout.LayoutMethod=\"VerticalBottomToTop\" " +
-                "               MarginTop=\"20\" MarginBottom=\"10\" MarginLeft=\"10\" MarginRight=\"10\">" +
+                "               MarginTop=\"15\" MarginBottom=\"15\" MarginLeft=\"10\" MarginRight=\"10\">" +
                 "      <Children>" +
-                // Header
                 "        <TextWidget WidthSizePolicy=\"StretchToParent\" HeightSizePolicy=\"CoverChildren\" " +
                 "                    HorizontalAlignment=\"Center\" " +
-                "                    MarginBottom=\"16\" " +
+                "                    MarginBottom=\"10\" " +
                 "                    Text=\"@GuestsStageBodyText\" " +
                 "                    Brush=\"Popup.Title.Text\" />" +
-                // Invitee list (no scroll for now — overflow is acceptable for v0; ScrollablePanel
-                // requires a complex ClipRect/InnerPanel/Scrollbar sibling-widget setup we'll add later).
-                "        <ListPanel DataSource=\"{Invitees}\" " +
-                "                   WidthSizePolicy=\"StretchToParent\" HeightSizePolicy=\"CoverChildren\" " +
-                "                   StackLayout.LayoutMethod=\"VerticalBottomToTop\">" +
-                "          <ItemTemplate>" +
-                "            <ButtonWidget DoNotPassEventsToChildren=\"true\" " +
-                "                          WidthSizePolicy=\"StretchToParent\" HeightSizePolicy=\"Fixed\" " +
-                "                          SuggestedHeight=\"36\" MarginBottom=\"4\" " +
-                "                          Command.Click=\"ExecuteToggle\" " +
-                "                          IsSelected=\"@IsInvited\" " +
-                "                          UpdateChildrenStates=\"true\">" +
+                // Frame1Brush — vanilla's wood-and-brass frame. CoverChildren width sizes to the
+                // header row + scrollbar; StretchToParent height fills below the body text.
+                "        <BrushListPanel WidthSizePolicy=\"CoverChildren\" HeightSizePolicy=\"StretchToParent\" " +
+                "                        HorizontalAlignment=\"Center\" VerticalAlignment=\"Bottom\" " +
+                "                        Brush=\"Frame1Brush\" " +
+                "                        StackLayout.LayoutMethod=\"VerticalBottomToTop\">" +
+                "          <Children>" +
+                // Header row — RenderLate=true matches vanilla so headers draw on top of the list edge.
+                "            <ListPanel Id=\"FeastSortButtons\" " +
+                "                       WidthSizePolicy=\"CoverChildren\" HeightSizePolicy=\"CoverChildren\" " +
+                "                       RenderLate=\"true\" " +
+                "                       StackLayout.LayoutMethod=\"HorizontalLeftToRight\">" +
                 "              <Children>" +
-                "                <TextWidget WidthSizePolicy=\"StretchToParent\" HeightSizePolicy=\"StretchToParent\" " +
-                "                            HorizontalAlignment=\"Left\" VerticalAlignment=\"Center\" " +
-                "                            MarginLeft=\"12\" " +
-                "                            Text=\"@HeroName\" />" +
+                HeaderCellXml("Clan.Fiefs.Sort.1", 220, "Name") +
+                HeaderCellXml("Clan.Fiefs.Sort.2", 160, "Relation") +
+                HeaderCellXml("Clan.Fiefs.Sort.2", 160, "Possibility") +
+                HeaderCellXml("Clan.Fiefs.Sort.3", 100, "Invite") +
+                // Decorative scroll-header sprite — the brass clip-cap that anchors the top of the
+                // vertical scrollbar visually. Copied verbatim from ClanFiefs.xml line 79.
+                "                <Widget WidthSizePolicy=\"Fixed\" HeightSizePolicy=\"Fixed\" " +
+                "                        SuggestedWidth=\"20\" SuggestedHeight=\"44\" " +
+                "                        Sprite=\"StdAssets\\scroll_header\" " +
+                "                        ExtendRight=\"3\" ExtendTop=\"6\" ExtendLeft=\"3\" ExtendBottom=\"4\" " +
+                "                        HorizontalAlignment=\"Right\" />" +
                 "              </Children>" +
-                "            </ButtonWidget>" +
-                "          </ItemTemplate>" +
-                "        </ListPanel>" +
+                "            </ListPanel>" +
+                // Body: ScrollablePanel + Standard.VerticalScrollbar as siblings in a horizontal
+                // ListPanel (default direction is horizontal — matches vanilla ClanFiefs line 84).
+                "            <ListPanel WidthSizePolicy=\"CoverChildren\" HeightSizePolicy=\"StretchToParent\">" +
+                "              <Children>" +
+                "                <ScrollablePanel Id=\"InviteesScrollablePanel\" " +
+                "                                 WidthSizePolicy=\"CoverChildren\" MinWidth=\"640\" " +
+                "                                 HeightSizePolicy=\"StretchToParent\" " +
+                "                                 MarginLeft=\"3\" MarginBottom=\"3\" " +
+                "                                 AutoHideScrollBars=\"true\" " +
+                "                                 ClipRect=\"InviteesRect\" " +
+                "                                 InnerPanel=\"InviteesRect\\InviteesListPanel\" " +
+                "                                 MouseScrollAxis=\"Vertical\" " +
+                "                                 VerticalScrollbar=\"..\\InviteesScrollbar\\Scrollbar\">" +
+                "                  <Children>" +
+                "                    <Widget Id=\"InviteesRect\" " +
+                "                            WidthSizePolicy=\"CoverChildren\" HeightSizePolicy=\"StretchToParent\" " +
+                "                            ClipContents=\"true\">" +
+                "                      <Children>" +
+                "                        <ListPanel Id=\"InviteesListPanel\" DataSource=\"{Invitees}\" " +
+                "                                   WidthSizePolicy=\"CoverChildren\" HeightSizePolicy=\"CoverChildren\" " +
+                "                                   StackLayout.LayoutMethod=\"VerticalBottomToTop\">" +
+                "                          <ItemTemplate>" +
+                InviteeRowXml() +
+                "                          </ItemTemplate>" +
+                "                        </ListPanel>" +
+                "                      </Children>" +
+                "                    </Widget>" +
+                "                  </Children>" +
+                "                </ScrollablePanel>" +
+                // Vanilla scrollbar prefab — brass channel + handle, properly themed.
+                "                <Standard.VerticalScrollbar Id=\"InviteesScrollbar\" " +
+                "                                            HeightSizePolicy=\"StretchToParent\" " +
+                "                                            HorizontalAlignment=\"Right\" VerticalAlignment=\"Bottom\" " +
+                "                                            MarginRight=\"2\" MarginLeft=\"2\" MarginBottom=\"3\" />" +
+                "              </Children>" +
+                "            </ListPanel>" +
+                "          </Children>" +
+                "        </BrushListPanel>" +
                 "      </Children>" +
                 "    </ListPanel>" +
                 "  </Children>" +
                 "</Widget>";
+        }
+
+        // Per-row item template for the invitee list. Four fixed-width cells whose widths match the
+        // header row (220+160+160+100=640). The outer ButtonWidget is the click target that toggles
+        // IsInvited; the checkbox inside cell 4 is purely visual (DoNotAcceptEvents=true).
+        private static string InviteeRowXml()
+        {
+            return
+                "<ButtonWidget DoNotPassEventsToChildren=\"true\" " +
+                "              WidthSizePolicy=\"Fixed\" HeightSizePolicy=\"Fixed\" " +
+                "              SuggestedWidth=\"640\" SuggestedHeight=\"90\" " +
+                "              MarginBottom=\"4\" " +
+                "              Brush=\"Clan.Item.Tuple\" " +
+                "              Command.Click=\"ExecuteToggle\" " +
+                "              IsSelected=\"@IsInvited\" " +
+                "              UpdateChildrenStates=\"true\">" +
+                "  <Children>" +
+                "    <ListPanel WidthSizePolicy=\"StretchToParent\" HeightSizePolicy=\"StretchToParent\" " +
+                "               StackLayout.LayoutMethod=\"HorizontalLeftToRight\">" +
+                "      <Children>" +
+                // Cell 1: Name (220 wide) — portrait on left, name+house stacked to its right
+                "        <Widget WidthSizePolicy=\"Fixed\" HeightSizePolicy=\"StretchToParent\" SuggestedWidth=\"220\">" +
+                "          <Children>" +
+                "            <ImageIdentifierWidget DataSource=\"{ImageIdentifier}\" " +
+                "                                   WidthSizePolicy=\"Fixed\" HeightSizePolicy=\"Fixed\" " +
+                "                                   SuggestedWidth=\"100\" SuggestedHeight=\"70\" " +
+                "                                   HorizontalAlignment=\"Left\" VerticalAlignment=\"Center\" " +
+                "                                   MarginLeft=\"8\" " +
+                "                                   AdditionalArgs=\"@AdditionalArgs\" ImageId=\"@Id\" TextureProviderName=\"@TextureProviderName\" />" +
+                "            <ListPanel WidthSizePolicy=\"CoverChildren\" HeightSizePolicy=\"CoverChildren\" " +
+                "                       StackLayout.LayoutMethod=\"VerticalBottomToTop\" " +
+                "                       HorizontalAlignment=\"Left\" VerticalAlignment=\"Center\" " +
+                "                       MarginLeft=\"118\">" +
+                "              <Children>" +
+                "                <TextWidget WidthSizePolicy=\"CoverChildren\" HeightSizePolicy=\"CoverChildren\" " +
+                "                            Text=\"@HeroName\" />" +
+                "                <TextWidget WidthSizePolicy=\"CoverChildren\" HeightSizePolicy=\"CoverChildren\" " +
+                "                            MarginTop=\"2\" " +
+                "                            Brush=\"Clan.Leader.Text\" " +
+                "                            Text=\"@HouseName\" />" +
+                "              </Children>" +
+                "            </ListPanel>" +
+                "          </Children>" +
+                "        </Widget>" +
+                // Cell 2: Relation (160 wide) — centered text
+                "        <Widget WidthSizePolicy=\"Fixed\" HeightSizePolicy=\"StretchToParent\" SuggestedWidth=\"160\">" +
+                "          <Children>" +
+                "            <TextWidget WidthSizePolicy=\"StretchToParent\" HeightSizePolicy=\"StretchToParent\" " +
+                "                        HorizontalAlignment=\"Center\" VerticalAlignment=\"Center\" " +
+                "                        Brush.TextHorizontalAlignment=\"Center\" " +
+                "                        Text=\"@RelationText\" />" +
+                "          </Children>" +
+                "        </Widget>" +
+                // Cell 3: Possibility (160 wide) — placeholder until RSVP probability lands
+                "        <Widget WidthSizePolicy=\"Fixed\" HeightSizePolicy=\"StretchToParent\" SuggestedWidth=\"160\">" +
+                "          <Children>" +
+                "            <TextWidget WidthSizePolicy=\"StretchToParent\" HeightSizePolicy=\"StretchToParent\" " +
+                "                        HorizontalAlignment=\"Center\" VerticalAlignment=\"Center\" " +
+                "                        Brush.TextHorizontalAlignment=\"Center\" " +
+                "                        Text=\"—\" />" +
+                "          </Children>" +
+                "        </Widget>" +
+                // Cell 4: Invite (100 wide) — visual-only Toggle checkbox; row absorbs the click
+                "        <Widget WidthSizePolicy=\"Fixed\" HeightSizePolicy=\"StretchToParent\" SuggestedWidth=\"100\">" +
+                "          <Children>" +
+                "            <ButtonWidget DoNotAcceptEvents=\"true\" " +
+                "                          WidthSizePolicy=\"Fixed\" HeightSizePolicy=\"Fixed\" " +
+                "                          SuggestedWidth=\"32\" SuggestedHeight=\"32\" " +
+                "                          HorizontalAlignment=\"Center\" VerticalAlignment=\"Center\" " +
+                "                          Brush=\"SPOptions.Checkbox.Empty.Button\" " +
+                "                          ButtonType=\"Toggle\" " +
+                "                          IsSelected=\"@IsInvited\" " +
+                "                          ToggleIndicator=\"ToggleIndicator\" " +
+                "                          UpdateChildrenStates=\"true\">" +
+                "              <Children>" +
+                "                <ImageWidget Id=\"ToggleIndicator\" " +
+                "                             WidthSizePolicy=\"StretchToParent\" HeightSizePolicy=\"StretchToParent\" " +
+                "                             Brush=\"SPOptions.Checkbox.Full.Button\" />" +
+                "              </Children>" +
+                "            </ButtonWidget>" +
+                "          </Children>" +
+                "        </Widget>" +
+                "      </Children>" +
+                "    </ListPanel>" +
+                "  </Children>" +
+                "</ButtonWidget>";
+        }
+
+        private static string HeaderCellXml(string brush, int width, string label)
+        {
+            return
+                "<ButtonWidget DoNotAcceptEvents=\"true\" " +
+                "              WidthSizePolicy=\"Fixed\" HeightSizePolicy=\"Fixed\" " +
+                "              SuggestedWidth=\"" + width + "\" SuggestedHeight=\"44\" " +
+                "              Brush=\"" + brush + "\" " +
+                "              UpdateChildrenStates=\"true\">" +
+                "  <Children>" +
+                "    <TextWidget WidthSizePolicy=\"CoverChildren\" HeightSizePolicy=\"CoverChildren\" " +
+                "                HorizontalAlignment=\"Center\" VerticalAlignment=\"Center\" " +
+                "                Brush=\"Clan.LeftPanel.Header.Text\" " +
+                "                Text=\"" + label + "\" />" +
+                "  </Children>" +
+                "</ButtonWidget>";
         }
 
         // Phase E content for the Provisions stage: header text + list of required-vs-current per
@@ -280,7 +434,7 @@ namespace FeastsOfCalradia.UI
             return
                 "<Widget Id=\"FeastRightColumn\" " +
                 "        WidthSizePolicy=\"Fixed\" HeightSizePolicy=\"StretchToParent\" " +
-                "        SuggestedWidth=\"220\" " +
+                "        SuggestedWidth=\"240\" " +
                 "        HorizontalAlignment=\"Right\" VerticalAlignment=\"Top\" " +
                 "        MarginRight=\"10\" MarginTop=\"10\">" +
                 "  <Children>" +

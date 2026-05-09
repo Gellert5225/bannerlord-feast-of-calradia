@@ -9,7 +9,9 @@
       "WebFetch(domain:raw.githubusercontent.com)",
       "WebFetch(domain:github.com)",
       "WebFetch(domain:butr.github.io)",
-      "WebFetch(domain:uiextenderex.butr.link)"
+      "WebFetch(domain:uiextenderex.butr.link)",
+      "WebFetch(domain:apidoc.bannerlord.com)",
+      "Bash(dotnet build *)"
     ]
   }
 }
